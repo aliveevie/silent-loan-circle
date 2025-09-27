@@ -1,0 +1,24 @@
+{
+  "name": "example-bboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "api",
+    "bboard-cli", 
+    "bboard-ui",
+    "contract",
+    "silent-loan-circle/api",
+    "silent-loan-circle/silent-loan-circle-cli",
+    "silent-loan-circle/contract"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "install-all": "npm install && npm install --workspaces"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.8",
+    "typescript": "^5.5.2"
+  }
+}
