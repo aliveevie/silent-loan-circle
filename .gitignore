@@ -5,6 +5,8 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+managed
+
 # Build outputs
 dist/
 build/
