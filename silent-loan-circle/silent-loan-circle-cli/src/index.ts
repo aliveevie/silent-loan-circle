@@ -283,7 +283,7 @@ const buildWallet = async (config: Config, rli: Interface, logger: Logger): Prom
   }
 };
 
-export const run = async (config: Config, logger: Logger): Promise<void> => {
+export const run = async (config: Config, logger: Logger, dockerEnv?: any): Promise<void> => {
   const rli = createInterface({ input, output, terminal: true });
 
   try {
