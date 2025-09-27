@@ -1,6 +1,12 @@
 // Silent Loan Circle Smart Contract
 // A privacy-preserving ROSCA (Rotating Savings and Credit Association)
-// Copyright (C) 2025 Midnight Foundation
+// 
+// This contract implements a trustless, privacy-preserving rotating savings
+// and credit association where members contribute to a common fund and
+// take turns receiving the total pool amount. All operations use zero-knowledge
+// proofs to maintain privacy while ensuring correctness.
+//
+// Copyright (C) 2025 Midnight Foundation  
 // SPDX-License-Identifier: Apache-2.0
 
 circuit CircleState = Enum {
@@ -151,4 +157,20 @@ circuit getCurrentStatus(
   ledgerState: LedgerState
 ): (CircleState, UInt, UInt) {
   (ledgerState.circleState, ledgerState.currentCycleIndex, ledgerState.payoutPointer)
+}
+
+// Validate member eligibility for receiving payout
+circuit validatePayoutEligibility(
+  ledgerState: LedgerState,
+  memberIndex: UInt
+): Bool {
+  // Ensure the member index is valid and it's their turn
+  memberIndex < ledgerState.memberCount && memberIndex == ledgerState.payoutPointer
+}
+
+// Calculate total expected contributions for current cycle
+circuit calculateExpectedContributions(
+  ledgerState: LedgerState
+): UInt {
+  ledgerState.contributionAmount * ledgerState.memberCount
 }
