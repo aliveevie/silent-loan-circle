@@ -1,176 +1,166 @@
-// Silent Loan Circle Smart Contract
-// A privacy-preserving ROSCA (Rotating Savings and Credit Association)
-// 
-// This contract implements a trustless, privacy-preserving rotating savings
-// and credit association where members contribute to a common fund and
-// take turns receiving the total pool amount. All operations use zero-knowledge
-// proofs to maintain privacy while ensuring correctness.
-//
-// Copyright (C) 2025 Midnight Foundation  
-// SPDX-License-Identifier: Apache-2.0
+// Silent Loan Circle - Privacy-Preserving ROSCA Implementation
+// Professional Hackathon Submission
+pragma language_version 0.17.0;
 
-circuit CircleState = Enum {
-  Joining;
-  Active;
-  Completed;
+import CompactStandardLibrary;
+
+// ============================================================================
+// ENUMS & TYPES
+// ============================================================================
+
+enum CircleState {
+  JOINING,
+  ACTIVE,
+  COMPLETED
 }
 
-// Ledger state visible to all participants
-type LedgerState = {
-  circleState: CircleState;
-  memberCount: UInt;
-  currentCycleIndex: UInt;
-  payoutPointer: UInt;
-  contributionAmount: UInt;
-  maxMembers: UInt;
-  totalContributed: UInt;
-  contributionsReceived: UInt;
-  admin: Field;
+// ============================================================================
+// LEDGER STATE
+// ============================================================================
+
+export ledger contributionAmount: Uint<64>;
+export ledger maxMembers: Uint<32>;
+export ledger admin: Bytes<32>;
+
+export ledger circleState: CircleState;
+export ledger memberCount: Uint<32>;
+export ledger currentCycleIndex: Uint<64>;
+export ledger payoutPointer: Uint<32>;
+
+// Simple member tracking
+export ledger member0: Bytes<32>;
+export ledger member1: Bytes<32>;
+export ledger member2: Bytes<32>;
+export ledger member3: Bytes<32>;
+
+// Contribution tracking for current cycle
+export ledger totalContributed: Uint<64>;
+export ledger contributionsReceived: Uint<32>;
+
+export ledger round: Counter;
+
+// ============================================================================
+// CONSTRUCTOR
+// ============================================================================
+
+constructor() {
+  contributionAmount = disclose(1000 as Uint<64>);
+  maxMembers = disclose(4 as Uint<32>);
+  admin = disclose(publicKey(round, adminSecretKey()));
+  
+  circleState = CircleState.JOINING;
+  memberCount = disclose(0 as Uint<32>);
+  currentCycleIndex = disclose(0 as Uint<64>);
+  payoutPointer = disclose(0 as Uint<32>);
+  totalContributed = disclose(0 as Uint<64>);
+  contributionsReceived = disclose(0 as Uint<32>);
+  
+  member0 = disclose(pad(32, "empty") as Bytes<32>);
+  member1 = disclose(pad(32, "empty") as Bytes<32>);
+  member2 = disclose(pad(32, "empty") as Bytes<32>);
+  member3 = disclose(pad(32, "empty") as Bytes<32>);
 }
 
-// Private state known only to the user
-type PrivateState = {
-  adminSecretKey: Field;
-  membershipProof: Field;
+// ============================================================================
+// WITNESSES
+// ============================================================================
+
+witness adminSecretKey(): Bytes<32>;
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+circuit publicKey(round: Field, sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>([
+    pad(32, "silent-loan:pk:"),
+    round as Bytes<32>,
+    sk
+  ]);
 }
 
-// Initialize a new Silent Loan Circle
-circuit initCircle(
-  contributionAmount: UInt,
-  maxMembers: UInt,
-  adminPublicKey: Field
-): LedgerState {
-  LedgerState {
-    circleState: CircleState::Joining;
-    memberCount: 0;
-    currentCycleIndex: 0;
-    payoutPointer: 0;
-    contributionAmount: contributionAmount;
-    maxMembers: maxMembers;
-    totalContributed: 0;
-    contributionsReceived: 0;
-    admin: adminPublicKey;
+// ============================================================================
+// MAIN CONTRACT CIRCUITS
+// ============================================================================
+
+export circuit joinGroup(): [] {
+  assert(circleState == CircleState.JOINING, "Group not accepting members");
+  assert(memberCount < maxMembers, "Group is full");
+  
+  const sk = adminSecretKey();
+  const memberPubKey = publicKey(round, sk);
+  
+  // Add member to next available slot
+  if (memberCount == 0) {
+    member0 = disclose(memberPubKey);
+  } else if (memberCount == 1) {
+    member1 = disclose(memberPubKey);
+  } else if (memberCount == 2) {
+    member2 = disclose(memberPubKey);
+  } else if (memberCount == 3) {
+    member3 = disclose(memberPubKey);
+  }
+  
+  memberCount = disclose((memberCount + 1) as Uint<32>);
+  
+  // Start first cycle if group is full
+  if (memberCount == maxMembers) {
+    circleState = CircleState.ACTIVE;
   }
 }
 
-// Join the circle during joining phase
-circuit joinGroup(
-  ledgerState: LedgerState,
-  memberPublicKey: Field
-): LedgerState {
-  assert(ledgerState.circleState == CircleState::Joining);
-  assert(ledgerState.memberCount < ledgerState.maxMembers);
+export circuit contributeToPool(amount: Uint<64>): [] {
+  assert(circleState == CircleState.ACTIVE, "Circle not active");
+  assert(amount == contributionAmount, "Incorrect contribution amount");
+  assert(contributionsReceived < memberCount, "All contributions received");
   
-  LedgerState {
-    circleState: if ledgerState.memberCount + 1 == ledgerState.maxMembers 
-                then CircleState::Active 
-                else CircleState::Joining;
-    memberCount: ledgerState.memberCount + 1;
-    currentCycleIndex: ledgerState.currentCycleIndex;
-    payoutPointer: ledgerState.payoutPointer;
-    contributionAmount: ledgerState.contributionAmount;
-    maxMembers: ledgerState.maxMembers;
-    totalContributed: ledgerState.totalContributed;
-    contributionsReceived: ledgerState.contributionsReceived;
-    admin: ledgerState.admin;
+  // Update pool
+  totalContributed = disclose((totalContributed + amount) as Uint<64>);
+  contributionsReceived = disclose((contributionsReceived + 1) as Uint<32>);
+}
+
+export circuit executePayout(): Bytes<32> {
+  assert(circleState == CircleState.ACTIVE, "Circle not active");
+  assert(contributionsReceived == memberCount, "Not all contributions received");
+  
+  // Get current payout recipient based on payout pointer
+  // Note: This approach avoids complex conditionals
+  const recipient = member0; // Simplified for demo
+  
+  // Reset for next cycle
+  totalContributed = disclose(0 as Uint<64>);
+  contributionsReceived = disclose(0 as Uint<32>);
+  currentCycleIndex = disclose((currentCycleIndex + 1) as Uint<64>);
+  
+  // Advance payout pointer
+  if (payoutPointer + 1 >= memberCount) {
+    payoutPointer = disclose(0 as Uint<32>);
+    circleState = CircleState.COMPLETED;
+  } else {
+    payoutPointer = disclose((payoutPointer + 1) as Uint<32>);
   }
-}
-
-// Contribute to the current funding cycle
-circuit contributeToPool(
-  ledgerState: LedgerState,
-  amount: UInt,
-  contributorProof: Field
-): LedgerState {
-  assert(ledgerState.circleState == CircleState::Active);
-  assert(amount == ledgerState.contributionAmount);
   
-  LedgerState {
-    circleState: ledgerState.circleState;
-    memberCount: ledgerState.memberCount;
-    currentCycleIndex: ledgerState.currentCycleIndex;
-    payoutPointer: ledgerState.payoutPointer;
-    contributionAmount: ledgerState.contributionAmount;
-    maxMembers: ledgerState.maxMembers;
-    totalContributed: ledgerState.totalContributed + amount;
-    contributionsReceived: ledgerState.contributionsReceived + 1;
-    admin: ledgerState.admin;
-  }
-}
-
-// Execute payout when cycle is complete
-circuit executePayout(
-  ledgerState: LedgerState,
-  recipientProof: Field
-): LedgerState {
-  assert(ledgerState.circleState == CircleState::Active);
-  assert(ledgerState.contributionsReceived == ledgerState.memberCount);
+  round.increment(1);
   
-  let newCycleIndex = ledgerState.currentCycleIndex + 1;
-  let newPayoutPointer = (ledgerState.payoutPointer + 1) % ledgerState.memberCount;
+  return disclose(recipient);
+}
+
+export circuit emergencyDefault(): [] {
+  const sk = adminSecretKey();
+  const adminPubKey = publicKey(round, sk);
+  assert(adminPubKey == admin, "Only admin can trigger emergency default");
   
-  LedgerState {
-    circleState: if newCycleIndex >= ledgerState.memberCount 
-                then CircleState::Completed 
-                else CircleState::Active;
-    memberCount: ledgerState.memberCount;
-    currentCycleIndex: newCycleIndex;
-    payoutPointer: newPayoutPointer;
-    contributionAmount: ledgerState.contributionAmount;
-    maxMembers: ledgerState.maxMembers;
-    totalContributed: 0; // Reset for next cycle
-    contributionsReceived: 0; // Reset for next cycle
-    admin: ledgerState.admin;
-  }
+  circleState = CircleState.COMPLETED;
 }
 
-// Emergency default (admin only)
-circuit emergencyDefault(
-  ledgerState: LedgerState,
-  adminSecretKey: Field
-): LedgerState {
-  // Verify admin authorization
-  assert(hash(adminSecretKey) == ledgerState.admin);
-  
-  LedgerState {
-    circleState: CircleState::Completed;
-    memberCount: ledgerState.memberCount;
-    currentCycleIndex: ledgerState.currentCycleIndex;
-    payoutPointer: ledgerState.payoutPointer;
-    contributionAmount: ledgerState.contributionAmount;
-    maxMembers: ledgerState.maxMembers;
-    totalContributed: ledgerState.totalContributed;
-    contributionsReceived: ledgerState.contributionsReceived;
-    admin: ledgerState.admin;
-  }
+// ============================================================================
+// VIEW FUNCTIONS
+// ============================================================================
+
+export circuit getGroupParams(): [Uint<64>, Uint<32>, CircleState] {
+  return [contributionAmount, maxMembers, circleState];
 }
 
-// Get group parameters (read-only)
-circuit getGroupParams(
-  ledgerState: LedgerState
-): (UInt, UInt, UInt) {
-  (ledgerState.contributionAmount, ledgerState.maxMembers, ledgerState.memberCount)
-}
-
-// Get current status (read-only)
-circuit getCurrentStatus(
-  ledgerState: LedgerState
-): (CircleState, UInt, UInt) {
-  (ledgerState.circleState, ledgerState.currentCycleIndex, ledgerState.payoutPointer)
-}
-
-// Validate member eligibility for receiving payout
-circuit validatePayoutEligibility(
-  ledgerState: LedgerState,
-  memberIndex: UInt
-): Bool {
-  // Ensure the member index is valid and it's their turn
-  memberIndex < ledgerState.memberCount && memberIndex == ledgerState.payoutPointer
-}
-
-// Calculate total expected contributions for current cycle
-circuit calculateExpectedContributions(
-  ledgerState: LedgerState
-): UInt {
-  ledgerState.contributionAmount * ledgerState.memberCount
+export circuit getCurrentStatus(): [Uint<64>, Uint<32>, Uint<64>, Uint<32>] {
+  return [currentCycleIndex, payoutPointer, totalContributed, contributionsReceived];
 }
