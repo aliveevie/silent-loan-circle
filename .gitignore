@@ -182,3 +182,6 @@ managed/
 
 # Proof server files
 proof-server-*.yml
+
+# Example projects
+example-bboard/
