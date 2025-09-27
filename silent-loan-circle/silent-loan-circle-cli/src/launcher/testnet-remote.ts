@@ -1,21 +1,23 @@
-// Silent Loan Circle CLI - Testnet Remote Launcher
+// This file is part of SILENT-LOAN-CIRCLE.
 // Copyright (C) 2025 Midnight Foundation
 // SPDX-License-Identifier: Apache-2.0
+// Licensed under the Apache License, Version 2.0 (the "License");
+// You may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 import { createLogger } from '../logger-utils.js';
 import { run } from '../index.js';
 import { TestnetRemoteConfig } from '../config.js';
 
-async function main() {
-  try {
-    const config = new TestnetRemoteConfig();
-    config.setNetworkId();
-    const logger = await createLogger(config.logDir);
-    await run(config, logger);
-  } catch (error) {
-    console.error('Failed to start Silent Loan Circle CLI:', error);
-    process.exit(1);
-  }
-}
-
-main();
+const config = new TestnetRemoteConfig();
+config.setNetworkId();
+const logger = await createLogger(config.logDir);
+await run(config, logger);
