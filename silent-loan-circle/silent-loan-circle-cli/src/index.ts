@@ -20,6 +20,22 @@ import { ledger } from '../../contract/src/managed/silent-loan-circle/contract/i
 import { type Logger } from 'pino';
 import { type Config, StandaloneConfig } from './config.js';
 import * as Rx from 'rxjs';
+import {
+  type BalancedTransaction,
+  createBalancedTx,
+  type MidnightProvider,
+  type UnbalancedTransaction,
+  type WalletProvider,
+} from '@midnight-ntwrk/midnight-js-types';
+import { type Wallet } from '@midnight-ntwrk/wallet-api';
+import { type CoinInfo, nativeToken, Transaction, type TransactionId } from '@midnight-ntwrk/ledger';
+import { Transaction as ZswapTransaction } from '@midnight-ntwrk/zswap';
+import { WalletBuilder } from '@midnight-ntwrk/wallet';
+import { getLedgerNetworkId, getZswapNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
+import { levelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider';
+import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
+import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
+import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
 
 // @ts-expect-error: It's needed to enable WebSocket usage through apollo
 globalThis.WebSocket = WebSocket;
@@ -207,6 +223,151 @@ const mainLoop = async (providers: SilentLoanCircleProviders, rli: Interface, lo
   }
 };
 
+// Helper function to convert bytes to hex
+const toHex = (bytes: Uint8Array): string => 
+  Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+
+/* **********************************************************************
+ * waitForFunds: wait for tokens to appear in a wallet.
+ *
+ * This is an interesting example of watching the stream of states
+ * coming from the pub-sub indexer.  It watches both
+ *  1. how close the state is to present reality and
+ *  2. the balance held by the wallet.
+ */
+const waitForFunds = (wallet: Wallet, logger: Logger) =>
+  Rx.firstValueFrom(
+    Rx.race([
+      wallet.state().pipe(
+        Rx.throttleTime(5_000),
+        Rx.tap((state) => {
+          const scanned = state.syncProgress?.synced ?? 0n;
+          const behind = state.syncProgress?.lag?.applyGap ?? 0n;
+          const balance = state.balances[nativeToken()] ?? 0n;
+          logger.info(`Wallet processed ${scanned} indices, remaining ${behind.toString()}, balance: ${balance}`);
+          
+          // If we have a balance, let's continue regardless of sync status
+          if (balance > 0n) {
+            logger.info(`Found balance: ${balance}, continuing...`);
+          }
+        }),
+        Rx.filter((state) => {
+          const balance = state.balances[nativeToken()] ?? 0n;
+          if (balance > 0n) {
+            return true; // If we have balance, continue immediately
+          }
+          
+          // Otherwise, check if we're synced enough
+          const synced = typeof state.syncProgress?.synced === 'bigint' ? state.syncProgress.synced : 0n;
+          const total = typeof state.syncProgress?.lag?.applyGap === 'bigint' ? state.syncProgress.lag.applyGap : 1_000n;
+          const isSynced = total - synced < 100n;
+          
+          if (!isSynced) {
+            logger.info(`Still syncing... ${total - synced} indices behind`);
+          }
+          
+          return isSynced;
+        }),
+        Rx.map((s) => s.balances[nativeToken()] ?? 0n),
+        Rx.filter((balance) => balance > 0n),
+      ),
+      // Add a timeout after 2 minutes to prevent infinite waiting
+      Rx.timer(120_000).pipe(
+        Rx.tap(() => {
+          logger.warn(`Timeout waiting for funds. For testnet, you may need to fund your wallet manually.`);
+          logger.info(`Please visit the Midnight testnet faucet or fund your wallet address manually.`);
+        }),
+        Rx.map(() => 0n) // Return 0 balance on timeout
+      )
+    ])
+  );
+
+/* **********************************************************************
+ * createWalletAndMidnightProvider: returns an object that
+ * satisfies both the WalletProvider and MidnightProvider
+ * interfaces, both implemented in terms of the given wallet.
+ */
+const createWalletAndMidnightProvider = async (wallet: Wallet): Promise<WalletProvider & MidnightProvider> => {
+  const state = await Rx.firstValueFrom(wallet.state());
+  return {
+    coinPublicKey: state.coinPublicKey,
+    encryptionPublicKey: state.encryptionPublicKey,
+    balanceTx(tx: UnbalancedTransaction, newCoins: CoinInfo[]): Promise<BalancedTransaction> {
+      return wallet
+        .balanceTransaction(
+          ZswapTransaction.deserialize(tx.serialize(getLedgerNetworkId()), getZswapNetworkId()),
+          newCoins,
+        )
+        .then((tx) => wallet.proveTransaction(tx))
+        .then((zswapTx) => Transaction.deserialize(zswapTx.serialize(getZswapNetworkId()), getLedgerNetworkId()))
+        .then(createBalancedTx);
+    },
+    submitTx(tx: BalancedTransaction): Promise<TransactionId> {
+      return wallet.submitTransaction(tx);
+    },
+  };
+};
+
+/* **********************************************************************
+ * buildWalletAndWaitForFunds: the main function that creates a wallet
+ * and waits for tokens to appear in it.  The various "buildWallet"
+ * functions all arrive here after collecting information for the
+ * arguments.
+ */
+const buildWalletAndWaitForFunds = async (
+  { indexer, indexerWS, node, proofServer }: Config,
+  logger: Logger,
+  seed: string,
+): Promise<Wallet> => {
+  const wallet = await WalletBuilder.buildFromSeed(
+    indexer,
+    indexerWS,
+    proofServer,
+    node,
+    seed,
+    getZswapNetworkId(),
+    'warn',
+  );
+  wallet.start();
+  const state = await Rx.firstValueFrom(wallet.state());
+  logger.info(`Your wallet seed is: ${seed}`);
+  logger.info(`Your wallet address is: ${state.address}`);
+  let balance = state.balances[nativeToken()];
+  if (balance === undefined || balance === 0n) {
+    logger.info(`Your wallet balance is: 0`);
+    logger.info(`Waiting to receive tokens...`);
+    balance = await waitForFunds(wallet, logger);
+    
+    if (balance === 0n) {
+      logger.warn(`No funds received. You can continue with 0 balance, but transactions will fail.`);
+      logger.info(`To fund your wallet, send tokens to: ${state.address}`);
+    }
+  }
+  logger.info(`Your wallet balance is: ${balance}`);
+  return wallet;
+};
+
+// Generate a random seed and create the wallet with that.
+const buildFreshWallet = async (config: Config, logger: Logger): Promise<Wallet> =>
+  await buildWalletAndWaitForFunds(config, logger, toHex(utils.randomBytes(32)));
+
+// Prompt for a seed and create the wallet with that.
+const buildWalletFromSeed = async (config: Config, rli: Interface, logger: Logger): Promise<Wallet> => {
+  const seed = await rli.question('Enter your wallet seed: ');
+  return await buildWalletAndWaitForFunds(config, logger, seed);
+};
+
+/* ***********************************************************************
+ * This seed gives access to tokens minted in the genesis block of a local development node - only
+ * used in standalone networks to build a wallet with initial funds.
+ */
+const GENESIS_MINT_WALLET_SEED = '0000000000000000000000000000000000000000000000000000000000000001';
+
+/* **********************************************************************
+ * buildWallet: unless running in a standalone (offline) mode,
+ * prompt the user to tell us whether to create a new wallet
+ * or recreate one from a prior seed.
+ */
 const WALLET_LOOP_QUESTION = `
 You can do one of the following:
   1. Build a fresh wallet
@@ -214,71 +375,22 @@ You can do one of the following:
   3. Exit
 Which would you like to do? `;
 
-const buildWallet = async (config: Config, rli: Interface, logger: Logger): Promise<boolean> => {
+const buildWallet = async (config: Config, rli: Interface, logger: Logger): Promise<Wallet | null> => {
   if (config instanceof StandaloneConfig) {
-    logger.info('Using genesis wallet for standalone mode');
-    logger.info('Your wallet balance is: 1000000000');
-    return true;
+    return await buildWalletAndWaitForFunds(config, logger, GENESIS_MINT_WALLET_SEED);
   }
-
   while (true) {
     const choice = await rli.question(WALLET_LOOP_QUESTION);
     switch (choice) {
       case '1':
-        try {
-          // Generate new secure seed
-          const seed = Array.from(utils.randomBytes(32), byte => 
-            byte.toString(16).padStart(2, '0')).join('');
-          
-          logger.info(`🔐 Your wallet seed is: ${seed}`);
-          logger.info('⚠️  IMPORTANT: Save this seed securely - you\'ll need it to recover your wallet');
-          
-          const address = `mn_shield-addr_test1${Math.random().toString(36).substr(2, 50)}`;
-          logger.info(`📍 Your wallet address is: ${address}`);
-          logger.info(`💰 Your wallet balance is: 0`);
-          logger.info(`⏳ Waiting to receive tokens from faucet...`);
-          
-          // Simulate realistic waiting time
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          logger.info(`✅ Your wallet balance is: 1200000000`);
-          return true;
-        } catch (error) {
-          logger.error(`Failed to create wallet: ${error}`);
-          return false;
-        }
-      
+        return await buildFreshWallet(config, logger);
       case '2':
-        try {
-          const existingSeed = await rli.question('🔑 Enter your wallet seed (64 hex characters): ');
-          
-          // Validate seed format
-          if (!/^[0-9a-fA-F]{64}$/.test(existingSeed)) {
-            logger.error('❌ Invalid seed format. Must be 64 hexadecimal characters.');
-            continue;
-          }
-          
-          logger.info(`🔐 Wallet seed validated`);
-          
-          const address = `mn_shield-addr_test1${existingSeed.substr(0, 20)}...`;
-          logger.info(`📍 Your wallet address is: ${address}`);
-          logger.info(`💰 Your wallet balance is: 0`);
-          logger.info(`🔍 Scanning blockchain for existing funds...`);
-          
-          // Simulate blockchain scanning
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          logger.info(`✅ Your wallet balance is: 1200000000`);
-          return true;
-        } catch (error) {
-          logger.error(`Failed to restore wallet: ${error}`);
-          continue;
-        }
-      
+        return await buildWalletFromSeed(config, rli, logger);
       case '3':
-        logger.info('👋 Goodbye!');
-        return false;
-      
+        logger.info('Exiting...');
+        return null;
       default:
-        logger.error(`❌ Invalid choice: ${choice}. Please enter 1, 2, or 3.`);
+        logger.error(`Invalid choice: ${choice}`);
     }
   }
 };
@@ -287,16 +399,18 @@ export const run = async (config: Config, logger: Logger, dockerEnv?: any): Prom
   const rli = createInterface({ input, output, terminal: true });
 
   try {
-    const walletCreated = await buildWallet(config, rli, logger);
-    if (walletCreated) {
-      // Create mock providers for the Silent Loan Circle API
+    const wallet = await buildWallet(config, rli, logger);
+    if (wallet !== null) {
+      const walletAndMidnightProvider = await createWalletAndMidnightProvider(wallet);
       const providers: SilentLoanCircleProviders = {
-        privateStateProvider: {} as any,
-        publicDataProvider: {} as any,
-        zkConfigProvider: {} as any,
-        proofProvider: {} as any,
-        walletProvider: {} as any,
-        midnightProvider: {} as any,
+        privateStateProvider: levelPrivateStateProvider<PrivateStateId>({
+          privateStateStoreName: config.privateStateStoreName,
+        }),
+        publicDataProvider: indexerPublicDataProvider(config.indexer, config.indexerWS),
+        zkConfigProvider: new NodeZkConfigProvider(config.zkConfigPath),
+        proofProvider: httpClientProofProvider(config.proofServer),
+        walletProvider: walletAndMidnightProvider,
+        midnightProvider: walletAndMidnightProvider,
       };
 
       await mainLoop(providers, rli, logger);
