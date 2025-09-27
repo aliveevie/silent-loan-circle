@@ -2,6 +2,10 @@
 
 A collection of privacy-preserving applications built on Midnight Network, showcasing zero-knowledge proof implementations and secure multi-party computation.
 
+c18480a93e189a037916f75c4d52df431f869e290971d7f3c8a82d51e364fccd
+fb59e8805ddd3ffabbbfa56f8cf935dfdc3c3a86bbabc4a6a8da6be45b19ca8b
+37ea59bd8381e92df32cad97a8bdb412a3f9f0937ada042bb4dfb2ea8da95618
+0xbabf5e9c15c531db59e05813f3593d09ff560a54
 ## Projects
 
 ### Silent Loan Circle

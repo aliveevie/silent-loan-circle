@@ -21,7 +21,28 @@
 
 import { type MidnightProviders } from '@midnight-ntwrk/midnight-js-types';
 import { type FoundContract } from '@midnight-ntwrk/midnight-js-contracts';
-import type { State, SilentLoanCirclePrivateState, Contract, Witnesses } from '../../contract/src/index';
+
+// Mock types for now - these will be replaced when the contract is properly integrated
+export type State = {
+  readonly circleState: number;
+  readonly memberCount: number;
+  readonly currentCycleIndex: number;
+  readonly payoutPointer: number;
+};
+
+export type SilentLoanCirclePrivateState = {
+  readonly secretKey: Uint8Array;
+  readonly membershipProof: Uint8Array;
+  readonly contributionHistory: readonly bigint[];
+};
+
+export type Contract<TPrivateState, TWitnesses> = {
+  readonly impureCircuits: Record<string, any>;
+  readonly witnesses: TWitnesses;
+  readonly initialState: TPrivateState;
+};
+
+export type Witnesses<TPrivateState> = Record<string, any>;
 
 export const silentLoanCirclePrivateStateKey = 'silentLoanCirclePrivateState';
 export type PrivateStateId = typeof silentLoanCirclePrivateStateKey;
@@ -75,7 +96,13 @@ export type SilentLoanCircleProviders = MidnightProviders<SilentLoanCircleCircui
  *
  * @public
  */
-export type DeployedSilentLoanCircleContract = FoundContract<SilentLoanCircleContract>;
+export type DeployedSilentLoanCircleContract = {
+  readonly deployTxData: {
+    readonly public: {
+      readonly contractAddress: string;
+    };
+  };
+};
 
 /**
  * A type that represents the derived combination of public (or ledger), and private state.
