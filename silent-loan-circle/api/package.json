@@ -1,18 +1,17 @@
 {
-  "name": "@silent-loan-circle/api",
+  "name": "@midnight-ntwrk/silent-loan-circle-api",
   "version": "0.1.0",
+  "author": "IOG",
+  "license": "MIT",
   "private": true,
   "type": "module",
-  "main": "dist/index.js",
+  "module": "./dist/index.js",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc --build",
-    "test": "echo 'No tests yet'"
-  },
-  "dependencies": {
-    "rxjs": "^7.8.1"
-  },
-  "devDependencies": {
-    "@types/node": "^20.14.8",
-    "typescript": "^5.5.2"
+    "build": "rm -rf dist && tsc --project tsconfig.build.json",
+    "ci": "npm run typecheck && npm run lint && npm run build",
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   }
 }
