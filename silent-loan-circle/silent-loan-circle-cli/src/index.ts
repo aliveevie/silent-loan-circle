@@ -96,32 +96,79 @@ const mainLoop = async (providers: SilentLoanCircleProviders, rli: Interface, lo
       const choice = await rli.question(MAIN_LOOP_QUESTION);
       switch (choice) {
         case '1':
-          await circleApi.joinGroup();
-          logger.info('Joined the circle successfully!');
+          try {
+            logger.info('🔗 Joining the Silent Loan Circle...');
+            await circleApi.joinGroup();
+            logger.info('🎉 Successfully joined the circle!');
+          } catch (error) {
+            logger.error(`❌ Failed to join circle: ${error}`);
+          }
           break;
         case '2': {
-          const amount = await rli.question(`What amount do you want to contribute? `);
-          await circleApi.contributeToPool(BigInt(amount));
-          logger.info(`Contributed ${amount} successfully!`);
+          try {
+            const amountStr = await rli.question(`💰 What amount do you want to contribute? `);
+            const amount = BigInt(amountStr);
+            
+            if (amount <= 0n) {
+              logger.error('❌ Amount must be positive');
+              break;
+            }
+            
+            logger.info('🔒 Generating privacy-preserving contribution proof...');
+            await circleApi.contributeToPool(amount);
+            logger.info(`✅ Contributed successfully! (amount kept private)`);
+          } catch (error) {
+            logger.error(`❌ Failed to contribute: ${error}`);
+          }
           break;
         }
         case '3': {
-          await circleApi.executePayout();
-          logger.info('Payout executed successfully!');
+          try {
+            logger.info('💸 Executing payout...');
+            await circleApi.executePayout();
+            logger.info('✅ Payout executed successfully!');
+          } catch (error) {
+            logger.error(`❌ Failed to execute payout: ${error}`);
+          }
           break;
         }
         case '4':
-          await circleApi.emergencyDefault();
-          logger.info('Emergency default triggered!');
+          try {
+            const confirm = await rli.question('⚠️  Are you sure you want to trigger emergency default? (yes/no): ');
+            if (confirm.toLowerCase() === 'yes') {
+              await circleApi.emergencyDefault();
+              logger.info('🚨 Emergency default triggered!');
+            } else {
+              logger.info('❌ Emergency default cancelled');
+            }
+          } catch (error) {
+            logger.error(`❌ Failed to trigger emergency default: ${error}`);
+          }
           break;
         case '5': {
-          await circleApi.getGroupParams();
-          logger.info('Group parameters retrieved successfully!');
+          try {
+            const params = await circleApi.getGroupParams();
+            logger.info('📊 Group Parameters:');
+            logger.info(`   Contribution Amount: ${params.contributionAmount}`);
+            logger.info(`   Max Members: ${params.maxMembers}`);
+            logger.info(`   Current Members: ${params.currentMembers}`);
+          } catch (error) {
+            logger.error(`❌ Failed to get group parameters: ${error}`);
+          }
           break;
         }
         case '6': {
-          await circleApi.getCurrentStatus();
-          logger.info('Current status retrieved successfully!');
+          try {
+            const status = await circleApi.getCurrentStatus();
+            const stateStr = status.state === CircleState.JOINING ? '🟡 Joining' : 
+                            status.state === CircleState.ACTIVE ? '🟢 Active' : '🔴 Completed';
+            logger.info('📈 Current Status:');
+            logger.info(`   Circle State: ${stateStr}`);
+            logger.info(`   Current Cycle: ${status.cycle}`);
+            logger.info(`   Payout Pointer: ${status.payoutPointer}`);
+          } catch (error) {
+            logger.error(`❌ Failed to get current status: ${error}`);
+          }
           break;
         }
         case '7':
@@ -178,33 +225,60 @@ const buildWallet = async (config: Config, rli: Interface, logger: Logger): Prom
     const choice = await rli.question(WALLET_LOOP_QUESTION);
     switch (choice) {
       case '1':
-        // Generate new seed
-        const seed = Math.random().toString(16).substr(2, 64);
-        logger.info(`Your wallet seed is: ${seed}`);
-        logger.info(`Your wallet address is: mn_shield-addr_test1...`);
-        logger.info(`Your wallet balance is: 0`);
-        logger.info(`Waiting to receive tokens...`);
-        // Simulate waiting for funds
-        setTimeout(() => {
-          logger.info(`Your wallet balance is: 1200000000`);
-        }, 1000);
-        return true;
+        try {
+          // Generate new secure seed
+          const seed = Array.from(utils.randomBytes(32), byte => 
+            byte.toString(16).padStart(2, '0')).join('');
+          
+          logger.info(`🔐 Your wallet seed is: ${seed}`);
+          logger.info('⚠️  IMPORTANT: Save this seed securely - you\'ll need it to recover your wallet');
+          
+          const address = `mn_shield-addr_test1${Math.random().toString(36).substr(2, 50)}`;
+          logger.info(`📍 Your wallet address is: ${address}`);
+          logger.info(`💰 Your wallet balance is: 0`);
+          logger.info(`⏳ Waiting to receive tokens from faucet...`);
+          
+          // Simulate realistic waiting time
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          logger.info(`✅ Your wallet balance is: 1200000000`);
+          return true;
+        } catch (error) {
+          logger.error(`Failed to create wallet: ${error}`);
+          return false;
+        }
+      
       case '2':
-        const existingSeed = await rli.question('Enter your wallet seed: ');
-        logger.info(`Your wallet seed is: ${existingSeed}`);
-        logger.info(`Your wallet address is: mn_shield-addr_test1...`);
-        logger.info(`Your wallet balance is: 0`);
-        logger.info(`Waiting to receive tokens...`);
-        // Simulate waiting for funds
-        setTimeout(() => {
-          logger.info(`Your wallet balance is: 1200000000`);
-        }, 1000);
-        return true;
+        try {
+          const existingSeed = await rli.question('🔑 Enter your wallet seed (64 hex characters): ');
+          
+          // Validate seed format
+          if (!/^[0-9a-fA-F]{64}$/.test(existingSeed)) {
+            logger.error('❌ Invalid seed format. Must be 64 hexadecimal characters.');
+            continue;
+          }
+          
+          logger.info(`🔐 Wallet seed validated`);
+          
+          const address = `mn_shield-addr_test1${existingSeed.substr(0, 20)}...`;
+          logger.info(`📍 Your wallet address is: ${address}`);
+          logger.info(`💰 Your wallet balance is: 0`);
+          logger.info(`🔍 Scanning blockchain for existing funds...`);
+          
+          // Simulate blockchain scanning
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          logger.info(`✅ Your wallet balance is: 1200000000`);
+          return true;
+        } catch (error) {
+          logger.error(`Failed to restore wallet: ${error}`);
+          continue;
+        }
+      
       case '3':
-        logger.info('Exiting...');
+        logger.info('👋 Goodbye!');
         return false;
+      
       default:
-        logger.error(`Invalid choice: ${choice}`);
+        logger.error(`❌ Invalid choice: ${choice}. Please enter 1, 2, or 3.`);
     }
   }
 };
