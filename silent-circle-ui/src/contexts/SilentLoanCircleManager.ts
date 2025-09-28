@@ -117,28 +117,63 @@ export class BrowserSilentLoanCircleManager implements DeployedCircleAPIProvider
   }
 
   private async initializeProviders(): Promise<SilentLoanCircleProviders> {
-    this.logger.info('Initializing mock providers for development...');
-
-    // Return mock providers for development
-    return {
-      privateStateProvider: {
-        get: async (key: string) => null,
-        set: async (key: string, value: any) => {},
-      },
-      publicDataProvider: {
-        contractStateObservable: (address: string, options: any) => {
-          return new Observable(subscriber => {
-            subscriber.next({ data: {} });
-          });
-        }
-      },
-      zkConfigProvider: {},
-      proofProvider: {},
-      walletProvider: {},
-      midnightProvider: {
-        submitTx: async (tx: any) => 'mock-tx-id'
-      },
-    };
+    try {
+      this.logger.info('Attempting to connect to Midnight Lace wallet...');
+      
+      // Try to connect to the real wallet first
+      const walletConnection = await this.connectToWallet();
+      
+      this.logger.info('Wallet connected successfully, initializing providers...');
+      
+      return {
+        privateStateProvider: {
+          get: async (key: string) => null,
+          set: async (key: string, value: any) => {},
+        },
+        publicDataProvider: {
+          contractStateObservable: (address: string, options: any) => {
+            return new Observable(subscriber => {
+              subscriber.next({ data: {} });
+            });
+          }
+        },
+        zkConfigProvider: walletConnection.uris.zkConfigProvider,
+        proofProvider: walletConnection.uris.proverServer,
+        walletProvider: walletConnection.wallet,
+        midnightProvider: {
+          submitTx: async (tx: any) => {
+            this.logger.info('Submitting transaction to wallet for signing...');
+            return walletConnection.wallet.submitTransaction(tx);
+          }
+        },
+      };
+    } catch (error) {
+      this.logger.warn('Failed to connect to real wallet, using mock providers:', error);
+      
+      // Fallback to mock providers if wallet connection fails
+      return {
+        privateStateProvider: {
+          get: async (key: string) => null,
+          set: async (key: string, value: any) => {},
+        },
+        publicDataProvider: {
+          contractStateObservable: (address: string, options: any) => {
+            return new Observable(subscriber => {
+              subscriber.next({ data: {} });
+            });
+          }
+        },
+        zkConfigProvider: {},
+        proofProvider: {},
+        walletProvider: {},
+        midnightProvider: {
+          submitTx: async (tx: any) => {
+            this.logger.info('Using mock transaction signing...');
+            return 'mock-tx-id';
+          }
+        },
+      };
+    }
   }
 
   private async joinDeployment(
@@ -190,19 +225,56 @@ export class BrowserSilentLoanCircleManager implements DeployedCircleAPIProvider
     }
   }
 
-  // Simplified for development - will implement real wallet connection later
   private async connectToWallet(): Promise<any> {
-    this.logger.info('Mock wallet connection for development');
+    this.logger.info('Attempting to connect to Midnight Lace wallet...');
+    
+    // Check if Midnight Lace wallet is available
+    if (!window.midnight?.mnLace) {
+      throw new Error('Midnight Lace wallet not found. Please install the extension.');
+    }
+
+    const connectorAPI = window.midnight.mnLace;
+    
+    // Check API version compatibility
+    const COMPATIBLE_VERSION = '1.x';
+    if (!semver.satisfies(connectorAPI.apiVersion, COMPATIBLE_VERSION)) {
+      throw new Error(`Incompatible wallet version. Required: ${COMPATIBLE_VERSION}, Found: ${connectorAPI.apiVersion}`);
+    }
+
+    this.logger.info('Compatible Midnight Lace wallet found, connecting...');
+
+    // Check if wallet is enabled
+    const isEnabled = await connectorAPI.isEnabled();
+    if (!isEnabled) {
+      this.logger.info('Wallet not enabled, requesting permission...');
+    }
+
+    // Enable the wallet (this will prompt user if needed)
+    const walletAPI = await connectorAPI.enable();
+    
+    // Get service configuration
+    const uris = await connectorAPI.getServiceUriConfig();
+    
+    this.logger.info('Successfully connected to Midnight Lace wallet');
+
     return {
       wallet: {
-        state: async () => ({ coinPublicKey: 'mock-key', encryptionPublicKey: 'mock-key' }),
-        getBalanceInfo: async () => ({ amount: 1000n }),
-        submitTransaction: async () => 'mock-tx-id'
+        state: () => walletAPI.state(),
+        getBalanceInfo: (query: any) => walletAPI.getBalanceInfo(query),
+        submitTransaction: async (tx: any) => {
+          this.logger.info('🔐 Prompting wallet to sign transaction...');
+          
+          // This is where the wallet signing popup will appear
+          const result = await walletAPI.submitTransaction(tx);
+          
+          this.logger.info('✅ Transaction signed successfully:', result);
+          return result;
+        }
       },
       uris: {
-        indexer: 'mock-uri',
-        zkConfigProvider: 'mock-uri',
-        proverServer: 'mock-uri'
+        indexer: uris.indexer,
+        zkConfigProvider: uris.zkConfigProvider,
+        proverServer: uris.proverServer
       }
     };
   }
