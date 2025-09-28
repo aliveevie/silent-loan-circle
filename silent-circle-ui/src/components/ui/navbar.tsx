@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "./button";
 import { Moon, Sun, Menu, X } from "lucide-react";
 import logo from "@/assets/logo.png";
+import { WalletConnectButton } from "../WalletConnectButton";
 
 interface NavbarProps {
   toggleTheme: () => void;
@@ -61,9 +62,7 @@ export function Navbar({ toggleTheme, isDark }: NavbarProps) {
             >
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-            <Button variant="primary" size="sm">
-              Connect Wallet
-            </Button>
+            <WalletConnectButton />
           </div>
 
           {/* Mobile Menu Button */}
@@ -114,9 +113,7 @@ export function Navbar({ toggleTheme, isDark }: NavbarProps) {
                     </>
                   )}
                 </Button>
-                <Button variant="primary" size="sm">
-                  Connect Wallet
-                </Button>
+                <WalletConnectButton />
               </div>
             </div>
           </div>
