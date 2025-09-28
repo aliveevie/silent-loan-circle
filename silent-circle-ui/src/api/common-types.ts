@@ -2,8 +2,8 @@
 // Copyright (C) 2025 Midnight Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { type MidnightProviders } from '@midnight-ntwrk/midnight-js-types';
-import { type ContractAddress } from '@midnight-ntwrk/compact-runtime';
+// Use string type for contract address to avoid import issues
+export type ContractAddress = string;
 
 /**
  * Enumeration representing the various states of a Silent Loan Circle.
@@ -96,11 +96,14 @@ export type SilentLoanCircleCircuitKeys =
 /**
  * Providers required by the Silent Loan Circle contract
  */
-export type SilentLoanCircleProviders = MidnightProviders<
-  SilentLoanCircleCircuitKeys,
-  PrivateStateId,
-  SilentLoanCirclePrivateState
->;
+export interface SilentLoanCircleProviders {
+  privateStateProvider: any;
+  publicDataProvider: any;
+  zkConfigProvider: any;
+  proofProvider: any;
+  walletProvider: any;
+  midnightProvider: any;
+}
 
 /**
  * A deployed Silent Loan Circle contract
