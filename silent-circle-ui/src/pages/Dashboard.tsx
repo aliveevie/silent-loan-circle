@@ -1,13 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Progress } from "@/components/ui/progress";
 import { Clock, Users, DollarSign, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { SilentLoanCircle } from "@/components/SilentLoanCircle";
+import { useSilentLoanCircleContext } from "@/hooks/useSilentLoanCircleContext";
+import { type Observable } from "rxjs";
+import { type CircleDeployment } from "@/contexts/SilentLoanCircleManager";
 
 export default function Dashboard() {
   const [showPrivateData, setShowPrivateData] = useState(false);
+  const circleApiProvider = useSilentLoanCircleContext();
+  const [circleDeployments, setCircleDeployments] = useState<Array<Observable<CircleDeployment>>>([]);
 
   // Mock data - in real app this would come from blockchain
   const circleData = {
@@ -34,6 +40,12 @@ export default function Dashboard() {
     { id: 5, name: "You", avatar: "", initials: "YU", status: "contributed" as const, isNext: false },
   ];
 
+  // Effect to subscribe to circle deployments
+  useEffect(() => {
+    const subscription = circleApiProvider.circleDeployments$.subscribe(setCircleDeployments);
+    return () => subscription.unsubscribe();
+  }, [circleApiProvider]);
+
   const cycleProgress = (circleData.currentCycle / circleData.totalCycles) * 100;
 
   return (
@@ -44,6 +56,18 @@ export default function Dashboard() {
           <p className="text-lg text-muted-foreground">
             Monitor your savings circle progress and contributions
           </p>
+        </div>
+
+        {/* Real Silent Loan Circle Components */}
+        <div className="mb-8 space-y-6">
+          {circleDeployments.map((circleDeployment, idx) => (
+            <div key={`circle-${idx}`} data-testid={`circle-${idx}`}>
+              <SilentLoanCircle circleDeployment$={circleDeployment} />
+            </div>
+          ))}
+          <div data-testid="circle-start">
+            <SilentLoanCircle />
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
