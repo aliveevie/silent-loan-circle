@@ -37,14 +37,19 @@ export default defineConfig(({ mode }) => ({
     global: 'globalThis',
   },
   optimizeDeps: {
-    // Exclude Midnight packages from pre-bundling to avoid issues
+    // Exclude ALL Midnight packages from pre-bundling to avoid import/export issues
     exclude: [
       '@midnight-ntwrk/compact-runtime',
       '@midnight-ntwrk/midnight-js-types',
       '@midnight-ntwrk/midnight-js-utils',
       '@midnight-ntwrk/dapp-connector-api',
       '@midnight-ntwrk/ledger',
-      '@midnight-ntwrk/midnight-js-contracts'
+      '@midnight-ntwrk/midnight-js-contracts',
+      '@midnight-ntwrk/midnight-js-fetch-zk-config-provider',
+      '@midnight-ntwrk/midnight-js-http-client-proof-provider',
+      '@midnight-ntwrk/midnight-js-indexer-public-data-provider',
+      '@midnight-ntwrk/midnight-js-level-private-state-provider',
+      '@midnight-ntwrk/midnight-js-network-id'
     ],
     include: [
       'buffer',
