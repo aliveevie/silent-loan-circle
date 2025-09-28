@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import React, { type PropsWithChildren, createContext, useMemo } from 'react';
-import { type DeployedCircleAPIProvider, SimpleHackathonManager } from './SimpleHackathonManager';
+import { type DeployedCircleAPIProvider, BrowserSilentLoanCircleManager } from './SilentLoanCircleManager';
 import { type Logger } from 'pino';
 
 /**
@@ -20,13 +20,13 @@ export type SilentLoanCircleProviderProps = PropsWithChildren<{
 }>;
 
 /**
- * A React component that sets a new {@link SimpleHackathonManager} object as the currently
+ * A React component that sets a new {@link BrowserSilentLoanCircleManager} object as the currently
  * in-scope deployed loan circle provider.
  */
 export const SilentLoanCircleProvider: React.FC<Readonly<SilentLoanCircleProviderProps>> = ({ logger, children }) => {
   const value = useMemo(() => {
-    console.log('🔧 Creating SimpleHackathonManager with logger:', logger);
-    return new SimpleHackathonManager(logger);
+    console.log('🔧 Creating BrowserSilentLoanCircleManager with logger:', logger);
+    return new BrowserSilentLoanCircleManager(logger);
   }, [logger]);
 
   return (

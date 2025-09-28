@@ -109,7 +109,30 @@ export default function CreateCircle() {
             // Navigate to dashboard to see the new circle
             navigate('/dashboard');
           } else if (deployment.status === 'failed') {
-            throw new Error(deployment.error.message);
+            console.error('Circle deployment failed:', deployment.error);
+            const errorMessage = deployment.error?.message || "Failed to create circle";
+            
+            // Handle specific wallet errors
+            if (errorMessage.includes('user rejected') || errorMessage.includes('User cancelled') || errorMessage.includes('rejected')) {
+              toast({
+                title: "❌ Transaction Cancelled",
+                description: "You cancelled the transaction in your Lace wallet. Please try again if you want to create the circle.",
+                variant: "destructive",
+              });
+            } else if (errorMessage.includes('extension') || errorMessage.includes('wallet') || errorMessage.includes('not found')) {
+              toast({
+                title: "❌ Wallet Connection Error",
+                description: "Please check that your Lace wallet extension is properly installed and enabled, then try again.",
+                variant: "destructive",
+              });
+            } else {
+              toast({
+                title: "❌ Creation Failed",
+                description: errorMessage,
+                variant: "destructive",
+              });
+            }
+            setIsCreating(false);
           }
         },
         error: (error) => {

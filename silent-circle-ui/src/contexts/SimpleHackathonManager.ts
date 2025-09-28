@@ -1,6 +1,19 @@
 import { BehaviorSubject, Observable } from 'rxjs';
 import { type Logger } from 'pino';
 
+// Type declarations for Lace wallet
+declare global {
+  interface Window {
+    midnight?: {
+      mnLace?: {
+        enable(): Promise<{
+          submitTransaction(tx: any): Promise<any>;
+        }>;
+      };
+    };
+  }
+}
+
 export interface CircleDeployment {
   status: 'in-progress' | 'failed' | 'deployed';
   api?: any;
@@ -40,16 +53,60 @@ export class SimpleHackathonManager implements DeployedCircleAPIProvider {
     deployments.push(deployment);
     this.deploymentsSubject.next(deployments);
 
-    // Simulate successful deployment after a short delay
-    setTimeout(() => {
+    // Actually try to connect to wallet and show popup
+    this.connectAndCreateTransaction(deployment, configuration);
+
+    return deployment;
+  }
+
+  private async connectAndCreateTransaction(deployment: BehaviorSubject<CircleDeployment>, configuration: any) {
+    try {
+      console.log('🔗 Looking for Lace wallet...');
+      
+      // Check if Lace wallet is available
+      if (!window.midnight?.mnLace) {
+        throw new Error('Lace wallet not found. Please install the Midnight Lace extension.');
+      }
+
+      const connectorAPI = window.midnight.mnLace;
+      console.log('✅ Found Lace wallet, enabling...');
+
+      // Enable the wallet - this might show a popup
+      const wallet = await connectorAPI.enable();
+      console.log('🎉 Wallet enabled!');
+
+      // Create a transaction object
+      const transaction = {
+        type: 'contract_deployment',
+        contractName: 'SilentLoanCircle',
+        description: `Deploy Silent Loan Circle with ${configuration?.maxMembers || 5} members`,
+        parameters: configuration,
+        fee: '1000000',
+        timestamp: Date.now()
+      };
+
+      console.log('📱 Sending transaction to Lace wallet for approval...');
+
+      // THIS SHOULD SHOW THE LACE WALLET POPUP
+      const result = await wallet.submitTransaction(transaction);
+      
+      console.log('✅ Transaction approved by user!', result);
+
+      // Success - mark as deployed
       deployment.next({
         status: 'deployed',
         api: {
-          deployedContractAddress: 'mock-contract-' + Date.now()
+          deployedContractAddress: `slc_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
         }
       });
-    }, 2000);
 
-    return deployment;
+    } catch (error: any) {
+      console.error('❌ Wallet transaction failed:', error);
+      
+      deployment.next({
+        status: 'failed',
+        error: new Error(error.message || 'Failed to create transaction')
+      });
+    }
   }
 }

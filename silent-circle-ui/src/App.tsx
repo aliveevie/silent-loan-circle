@@ -11,6 +11,8 @@ import Landing from "./pages/Landing";
 import CreateCircle from "./pages/CreateCircle";
 import Dashboard from "./pages/Dashboard";
 import ContributionFlow from "./pages/ContributionFlow";
+import ContributeToCircle from "./pages/ContributeToCircle";
+import ManageCircle from "./pages/ManageCircle";
 import History from "./pages/History";
 import NotFound from "./pages/NotFound";
 
@@ -26,11 +28,13 @@ const App = () => (
           <BrowserRouter>
             <Layout>
               <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/create" element={<CreateCircle />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/contribute" element={<ContributionFlow />} />
-                <Route path="/history" element={<History />} />
+                        <Route path="/" element={<Landing />} />
+                        <Route path="/create" element={<CreateCircle />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/contribute" element={<ContributionFlow />} />
+                        <Route path="/contribute/:circleId" element={<ContributeToCircle />} />
+                        <Route path="/manage/:circleId" element={<ManageCircle />} />
+                        <Route path="/history" element={<History />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

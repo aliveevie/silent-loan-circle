@@ -17,9 +17,7 @@ import {
   concatMap,
   catchError
 } from 'rxjs';
-import { pipe as fnPipe } from 'fp-ts/function';
 import { type Logger } from 'pino';
-import semver from 'semver';
 import {
   type DAppConnectorAPI,
   type DAppConnectorWalletAPI,
@@ -32,18 +30,11 @@ import {
   type CircleConfiguration,
   silentLoanCirclePrivateStateKey
 } from '../api/common-types';
-import { FetchZkConfigProvider } from '@midnight-ntwrk/midnight-js-fetch-zk-config-provider';
-import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
-import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
-import { levelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider';
-import {
-  type BalancedTransaction,
-  type UnbalancedTransaction,
-  createBalancedTx,
-} from '@midnight-ntwrk/midnight-js-types';
-import { type CoinInfo, Transaction, type TransactionId } from '@midnight-ntwrk/ledger';
-import { Transaction as ZswapTransaction } from '@midnight-ntwrk/zswap';
-import { getLedgerNetworkId, getZswapNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
+// Comment out problematic imports that cause browser issues
+// import { FetchZkConfigProvider } from '@midnight-ntwrk/midnight-js-fetch-zk-config-provider';
+// import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
+// import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
+// import { levelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider';
 import { SilentLoanCircleAPI, type DeployedSilentLoanCircleAPI } from '../api';
 
 /**
@@ -269,30 +260,17 @@ export class BrowserSilentLoanCircleManager implements DeployedCircleAPIProvider
     const COMPATIBLE_CONNECTOR_API_VERSION = '*'; // Accept any version for hackathon
 
     return firstValueFrom(
-      fnPipe(
-        interval(100),
+      interval(100).pipe(
         map(() => window.midnight?.mnLace),
         tap((connectorAPI) => {
           this.logger.info(connectorAPI, 'Check for wallet connector API');
         }),
         filter((connectorAPI): connectorAPI is DAppConnectorAPI => !!connectorAPI),
-        concatMap((connectorAPI) =>
-          semver.satisfies(connectorAPI.apiVersion, COMPATIBLE_CONNECTOR_API_VERSION)
-            ? of(connectorAPI)
-            : throwError(() => {
-                this.logger.error(
-                  {
-                    expected: COMPATIBLE_CONNECTOR_API_VERSION,
-                    actual: connectorAPI.apiVersion,
-                  },
-                  'Incompatible version of wallet connector API',
-                );
-
-                return new Error(
-                  `Incompatible version of Midnight Lace wallet found. Require '${COMPATIBLE_CONNECTOR_API_VERSION}', got '${connectorAPI.apiVersion}'.`,
-                );
-              }),
-        ),
+        concatMap((connectorAPI) => {
+          // Accept any version for simplified hackathon demo
+          this.logger.info(`Found Lace wallet API v${connectorAPI.apiVersion}`);
+          return of(connectorAPI);
+        }),
         tap((connectorAPI) => {
           this.logger.info(connectorAPI, '🎉 Compatible wallet connector API found. Connecting.');
         }),

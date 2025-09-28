@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Progress } from "@/components/ui/progress";
-import { Clock, Users, DollarSign, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { Clock, Users, DollarSign, ArrowRight, Eye, EyeOff, Plus, ExternalLink } from "lucide-react";
 import { SilentLoanCircle } from "@/components/SilentLoanCircle";
 import { WalletTester } from "@/components/WalletTester";
 import { useSilentLoanCircleContext } from "@/hooks/useSilentLoanCircleContext";
@@ -12,9 +13,44 @@ import { type Observable } from "rxjs";
 import { type CircleDeployment } from "@/contexts/SilentLoanCircleManager";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [showPrivateData, setShowPrivateData] = useState(false);
   const circleApiProvider = useSilentLoanCircleContext();
   const [circleDeployments, setCircleDeployments] = useState<Array<Observable<CircleDeployment>>>([]);
+  
+  // Mock available circles for users to join
+  const availableCircles = [
+    {
+      id: '1',
+      name: 'Emergency Fund Circle',
+      description: 'Build an emergency fund together with 10 members',
+      contributionAmount: '100.00',
+      currentMembers: 7,
+      maxMembers: 10,
+      cycleDuration: '30 days',
+      status: 'active' as const
+    },
+    {
+      id: '2', 
+      name: 'Vacation Savings Circle',
+      description: 'Save for your dream vacation with friends',
+      contributionAmount: '200.00',
+      currentMembers: 4,
+      maxMembers: 8,
+      cycleDuration: '60 days',
+      status: 'active' as const
+    },
+    {
+      id: '3',
+      name: 'Small Business Fund',
+      description: 'Help entrepreneurs start their businesses',
+      contributionAmount: '500.00',
+      currentMembers: 2,
+      maxMembers: 6,
+      cycleDuration: '90 days',
+      status: 'active' as const
+    }
+  ];
 
   // Mock data - in real app this would come from blockchain
   const circleData = {
@@ -63,6 +99,85 @@ export default function Dashboard() {
         <div className="mb-8">
           <div className="flex justify-center">
             <WalletTester />
+          </div>
+        </div>
+
+        {/* Available Circles to Join */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold">Available Circles</h2>
+              <p className="text-muted-foreground">Join an existing savings circle or create your own</p>
+            </div>
+            <Button onClick={() => navigate('/create')} className="flex items-center">
+              <Plus className="h-4 w-4 mr-2" />
+              Create New Circle
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {availableCircles.map((circle) => {
+              const progressPercentage = (circle.currentMembers / circle.maxMembers) * 100;
+              
+              return (
+                <Card key={circle.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{circle.name}</CardTitle>
+                      <StatusBadge status={circle.status} />
+                    </div>
+                    <CardDescription className="text-sm">
+                      {circle.description}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="flex items-center">
+                          <DollarSign className="h-4 w-4 mr-1" />
+                          {circle.contributionAmount} DUST
+                        </span>
+                        <span className="flex items-center">
+                          <Users className="h-4 w-4 mr-1" />
+                          {circle.currentMembers}/{circle.maxMembers}
+                        </span>
+                      </div>
+                      
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span>Members</span>
+                          <span>{Math.round(progressPercentage)}%</span>
+                        </div>
+                        <Progress value={progressPercentage} className="h-2" />
+                      </div>
+                      
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4 mr-1" />
+                        {circle.cycleDuration} cycle
+                      </div>
+                      
+                      <div className="flex space-x-2 mt-4">
+                        <Button 
+                          onClick={() => navigate(`/contribute/${circle.id}`)}
+                          className="flex-1"
+                          variant="outline"
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Join Circle
+                        </Button>
+                        <Button 
+                          onClick={() => navigate(`/manage/${circle.id}`)}
+                          className="flex-1"
+                          variant="default"
+                        >
+                          Manage
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
 
