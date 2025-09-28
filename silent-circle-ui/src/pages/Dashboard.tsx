@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Progress } from "@/components/ui/progress";
 import { Clock, Users, DollarSign, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { SilentLoanCircle } from "@/components/SilentLoanCircle";
+import { WalletTester } from "@/components/WalletTester";
 import { useSilentLoanCircleContext } from "@/hooks/useSilentLoanCircleContext";
 import { type Observable } from "rxjs";
 import { type CircleDeployment } from "@/contexts/SilentLoanCircleManager";
@@ -56,6 +57,13 @@ export default function Dashboard() {
           <p className="text-lg text-muted-foreground">
             Monitor your savings circle progress and contributions
           </p>
+        </div>
+
+        {/* Wallet Tester - Remove this after testing */}
+        <div className="mb-8">
+          <div className="flex justify-center">
+            <WalletTester />
+          </div>
         </div>
 
         {/* Real Silent Loan Circle Components */}
