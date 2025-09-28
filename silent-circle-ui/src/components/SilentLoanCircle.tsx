@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { type ContractAddress } from '@midnight-ntwrk/compact-runtime';
 import { type Observable } from 'rxjs';
 
 import {
@@ -34,6 +33,7 @@ import {
 import { useToast } from './ui/use-toast';
 
 import { 
+  type ContractAddress,
   type SilentLoanCircleDerivedState, 
   type CircleConfiguration,
   type DeployedSilentLoanCircleAPI,
