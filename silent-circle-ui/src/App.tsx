@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import ContributionFlow from "./pages/ContributionFlow";
 import ContributeToCircle from "./pages/ContributeToCircle";
 import ManageCircle from "./pages/ManageCircle";
+import JoinCircle from "./pages/JoinCircle";
 import History from "./pages/History";
 import NotFound from "./pages/NotFound";
 
@@ -34,6 +35,7 @@ const App = () => (
                         <Route path="/contribute" element={<ContributionFlow />} />
                         <Route path="/contribute/:circleId" element={<ContributeToCircle />} />
                         <Route path="/manage/:circleId" element={<ManageCircle />} />
+                        <Route path="/join/:circleId" element={<JoinCircle />} />
                         <Route path="/history" element={<History />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

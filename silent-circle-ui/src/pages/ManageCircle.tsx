@@ -20,7 +20,9 @@ import {
   Download,
   UserPlus,
   Wallet,
-  TrendingUp
+  TrendingUp,
+  Copy,
+  X
 } from "lucide-react";
 
 interface CircleManagementInfo {
@@ -53,56 +55,122 @@ export default function ManageCircle() {
   const [isInviting, setIsInviting] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [generatedInviteLink, setGeneratedInviteLink] = useState<string>('');
+  const [invitationHistory, setInvitationHistory] = useState<Array<{
+    link: string;
+    inviteeAddress: string;
+    createdAt: string;
+    token: string;
+  }>>([]);
 
-  // Mock circle management data
+  // Load real circle data
   useEffect(() => {
     const loadCircleInfo = async () => {
       setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        setCircleInfo({
-          id: circleId || '1',
-          name: 'Emergency Fund Circle',
-          contributionAmount: '100.00',
-          maxMembers: 10,
-          currentMembers: 7,
-          totalContributions: '2850.00',
-          nextPayoutDate: '2025-02-15',
-          cycleDuration: '30 days',
-          status: 'active',
-          members: [
+      
+      try {
+        // First, try to get from created circles in localStorage
+        const savedCircles = localStorage.getItem('userCreatedCircles');
+        let foundCircle = null;
+        
+        if (savedCircles) {
+          const createdCircles = JSON.parse(savedCircles);
+          foundCircle = createdCircles.find((circle: any) => circle.id === circleId);
+        }
+        
+        // If not found in created circles, check available circles (mock data)
+        if (!foundCircle) {
+          const availableCircles = [
             {
-              address: '0x1234...5678',
-              joinedDate: '2025-01-01',
-              totalContributed: '400.00',
-              status: 'active'
+              id: '1',
+              name: 'Emergency Fund Circle',
+              description: 'Build an emergency fund together with 10 members',
+              contributionAmount: '100.00',
+              currentMembers: 7,
+              maxMembers: 10,
+              cycleDuration: '30 days',
+              status: 'active' as const
             },
             {
-              address: '0x2345...6789',
-              joinedDate: '2025-01-03',
-              totalContributed: '300.00',
-              status: 'active'
+              id: '2',
+              name: 'Vacation Savings Circle',
+              description: 'Save for your dream vacation with friends',
+              contributionAmount: '200.00',
+              currentMembers: 4,
+              maxMembers: 8,
+              cycleDuration: '60 days',
+              status: 'active' as const
             },
             {
-              address: '0x3456...7890',
-              joinedDate: '2025-01-05',
-              totalContributed: '450.00',
-              status: 'active'
-            },
-            {
-              address: '0x4567...8901',
-              joinedDate: '2025-01-08',
-              totalContributed: '250.00',
-              status: 'pending'
+              id: '3',
+              name: 'Small Business Fund',
+              description: 'Help entrepreneurs start their businesses',
+              contributionAmount: '500.00',
+              currentMembers: 2,
+              maxMembers: 6,
+              cycleDuration: '90 days',
+              status: 'active' as const
             }
-          ]
+          ];
+          
+          foundCircle = availableCircles.find(circle => circle.id === circleId);
+        }
+        
+        if (foundCircle) {
+          // Calculate total contributions based on current members and contribution amount
+          const contributionPerMember = parseFloat(foundCircle.contributionAmount);
+          const totalContributions = (foundCircle.currentMembers * contributionPerMember).toFixed(2);
+          
+          // Generate mock members based on current member count
+          const members = [];
+          for (let i = 0; i < foundCircle.currentMembers; i++) {
+            members.push({
+              address: `0x${Math.random().toString(16).substring(2, 8)}...${Math.random().toString(16).substring(2, 6)}`,
+              joinedDate: new Date(Date.now() - (i * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
+              totalContributed: contributionPerMember.toFixed(2),
+              status: Math.random() > 0.8 ? 'pending' : 'active' as 'active' | 'pending'
+            });
+          }
+          
+          setCircleInfo({
+            id: foundCircle.id,
+            name: foundCircle.name,
+            contributionAmount: foundCircle.contributionAmount,
+            maxMembers: foundCircle.maxMembers,
+            currentMembers: foundCircle.currentMembers,
+            totalContributions,
+            nextPayoutDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            cycleDuration: foundCircle.cycleDuration,
+            status: foundCircle.status,
+            members
+          });
+        } else {
+          // Circle not found
+          toast({
+            title: "Circle Not Found",
+            description: "The requested circle could not be found.",
+            variant: "destructive",
+          });
+          navigate('/dashboard');
+          return;
+        }
+        
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error loading circle info:', error);
+        toast({
+          title: "Error Loading Circle",
+          description: "Failed to load circle information. Please try again.",
+          variant: "destructive",
         });
         setIsLoading(false);
-      }, 1000);
+      }
     };
 
-    loadCircleInfo();
-  }, [circleId]);
+    if (circleId) {
+      loadCircleInfo();
+    }
+  }, [circleId, navigate]);
 
   const handleInviteMember = async () => {
     if (!inviteAddress.trim()) {
@@ -114,47 +182,90 @@ export default function ManageCircle() {
       return;
     }
 
+    if (!circleInfo) return;
+
+    // Check if circle is full
+    if (circleInfo.currentMembers >= circleInfo.maxMembers) {
+      toast({
+        title: "Circle Full",
+        description: "This circle has reached its maximum member capacity.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if address is already a member
+    const isAlreadyMember = circleInfo.members.some(member => 
+      member.address.toLowerCase() === inviteAddress.toLowerCase()
+    );
+    
+    if (isAlreadyMember) {
+      toast({
+        title: "Already a Member",
+        description: "This address is already a member of the circle.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsInviting(true);
 
     try {
-      toast({
-        title: "📧 Sending Invitation",
-        description: `Sending invitation to ${inviteAddress}...`,
-      });
+      // Generate invitation token and link
+      const invitationToken = `inv_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const currentUrl = window.location.origin;
+      const invitationLink = `${currentUrl}/join/${circleInfo.id}?token=${invitationToken}&inviter=${address || 'unknown'}`;
+
+      // Store the invitation in localStorage for validation
+      const invitations = JSON.parse(localStorage.getItem('circleInvitations') || '{}');
+      invitations[invitationToken] = {
+        circleId: circleInfo.id,
+        inviterAddress: address,
+        inviteeAddress: inviteAddress,
+        createdAt: Date.now(),
+        status: 'pending'
+      };
+      localStorage.setItem('circleInvitations', JSON.stringify(invitations));
 
       // Simulate invitation process
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      toast({
-        title: "🎉 Invitation Sent!",
-        description: `Successfully invited ${inviteAddress} to join the circle.`,
-      });
+      // Store the generated link to display it
+      setGeneratedInviteLink(invitationLink);
 
-      setInviteAddress('');
-      setIsInviting(false);
+      // Add to invitation history
+      const newInvitation = {
+        link: invitationLink,
+        inviteeAddress: inviteAddress,
+        createdAt: new Date().toLocaleString(),
+        token: invitationToken
+      };
+      setInvitationHistory(prev => [newInvitation, ...prev]);
 
-      // Add to pending members list
-      if (circleInfo) {
-        const newMember = {
-          address: inviteAddress,
-          joinedDate: new Date().toISOString().split('T')[0],
-          totalContributed: '0.00',
-          status: 'pending' as const
-        };
-        
-        setCircleInfo({
-          ...circleInfo,
-          members: [...circleInfo.members, newMember]
+      // Copy invitation link to clipboard
+      try {
+        await navigator.clipboard.writeText(invitationLink);
+        toast({
+          title: "🎉 Invitation Link Created!",
+          description: "Link copied to clipboard! You can also copy it from the box below.",
+        });
+      } catch (clipboardError) {
+        toast({
+          title: "🎉 Invitation Link Created!",
+          description: "Link generated successfully! Copy it from the box below.",
         });
       }
+
+      setInviteAddress('');
 
     } catch (error: any) {
       console.error('Invitation failed:', error);
       toast({
-        title: "❌ Invitation Failed",
-        description: error.message || "Failed to send invitation. Please try again.",
+        title: "❌ Failed to Create Invitation",
+        description: error.message || "Failed to create invitation link. Please try again.",
         variant: "destructive",
       });
+    } finally {
       setIsInviting(false);
     }
   };
@@ -164,6 +275,21 @@ export default function ManageCircle() {
       toast({
         title: "Invalid Amount",
         description: "Please enter a valid withdrawal amount.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!circleInfo) return;
+
+    // Check if withdrawal amount exceeds available funds
+    const availableFunds = parseFloat(circleInfo.totalContributions);
+    const requestedAmount = parseFloat(withdrawAmount);
+    
+    if (requestedAmount > availableFunds) {
+      toast({
+        title: "Insufficient Funds",
+        description: `Cannot withdraw ${withdrawAmount} DUST. Available: ${circleInfo.totalContributions} DUST`,
         variant: "destructive",
       });
       return;
@@ -323,7 +449,7 @@ export default function ManageCircle() {
                 Invite Members
               </CardTitle>
               <CardDescription>
-                Invite new members to join your savings circle
+                Generate invitation links for new members to join your circle
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -347,15 +473,99 @@ export default function ManageCircle() {
                   {isInviting ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Sending Invitation...
+                      Creating Invitation Link...
                     </>
                   ) : (
                     <>
                       <Send className="h-4 w-4 mr-2" />
-                      Send Invitation
+                      Generate Invitation Link
                     </>
                   )}
                 </Button>
+
+                {/* Display Generated Invitation Link */}
+                {generatedInviteLink && (
+                  <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-medium text-green-800">🎉 Invitation Link Generated!</h4>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            navigator.clipboard.writeText(generatedInviteLink);
+                            toast({
+                              title: "Copied!",
+                              description: "Invitation link copied to clipboard.",
+                            });
+                          }}
+                          className="text-xs"
+                        >
+                          <Copy className="h-3 w-3 mr-1" />
+                          Copy Link
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setGeneratedInviteLink('')}
+                          className="text-xs text-gray-500"
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-green-700 mb-2">
+                      Share this link with the person you want to invite:
+                    </p>
+                    <div className="bg-white border border-green-300 rounded p-3">
+                      <code className="text-xs text-gray-800 break-all select-all">
+                        {generatedInviteLink}
+                      </code>
+                    </div>
+                    <p className="text-xs text-green-600 mt-2">
+                      💡 Tip: Click the link text to select all, then copy it manually if needed.
+                    </p>
+                  </div>
+                )}
+
+                {/* Invitation History */}
+                {invitationHistory.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Recent Invitations</h4>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {invitationHistory.slice(0, 5).map((invitation, index) => (
+                        <div key={invitation.token} className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-mono text-gray-600 truncate">
+                              {invitation.inviteeAddress}
+                            </p>
+                            <p className="text-gray-500">{invitation.createdAt}</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              navigator.clipboard.writeText(invitation.link);
+                              toast({
+                                title: "Copied!",
+                                description: "Invitation link copied to clipboard.",
+                              });
+                            }}
+                            className="text-xs ml-2"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    {invitationHistory.length > 5 && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        Showing 5 most recent invitations
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
