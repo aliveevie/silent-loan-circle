@@ -18,6 +18,11 @@ import {
 } from 'rxjs';
 import { type Logger } from 'pino';
 import semver from 'semver';
+import {
+  type DAppConnectorAPI,
+  type DAppConnectorWalletAPI,
+  type ServiceUriConfig,
+} from '@midnight-ntwrk/dapp-connector-api';
 
 import {
   type ContractAddress,
@@ -117,13 +122,13 @@ export class BrowserSilentLoanCircleManager implements DeployedCircleAPIProvider
   }
 
   private async initializeProviders(): Promise<SilentLoanCircleProviders> {
+    this.logger.info('🚀 Initializing providers with real Lace wallet integration...');
+    
     try {
-      this.logger.info('Attempting to connect to Midnight Lace wallet...');
-      
-      // Try to connect to the real wallet first
+      // This will trigger the Lace wallet connection popup
       const walletConnection = await this.connectToWallet();
       
-      this.logger.info('Wallet connected successfully, initializing providers...');
+      this.logger.info('✅ Wallet connected successfully, setting up providers...');
       
       return {
         privateStateProvider: {
@@ -142,37 +147,23 @@ export class BrowserSilentLoanCircleManager implements DeployedCircleAPIProvider
         walletProvider: walletConnection.wallet,
         midnightProvider: {
           submitTx: async (tx: any) => {
-            this.logger.info('Submitting transaction to wallet for signing...');
-            return walletConnection.wallet.submitTransaction(tx);
+            this.logger.info('🔐 Sending transaction to Lace wallet for approval...');
+            
+            // This is the critical part - this will show the Lace wallet transaction approval popup
+            try {
+              const result = await walletConnection.wallet.submitTransaction(tx);
+              this.logger.info('✅ Transaction approved and signed by user!', result);
+              return result;
+            } catch (error) {
+              this.logger.error('❌ Transaction rejected or failed:', error);
+              throw error;
+            }
           }
         },
       };
     } catch (error) {
-      this.logger.warn('Failed to connect to real wallet, using mock providers:', error);
-      
-      // Fallback to mock providers if wallet connection fails
-      return {
-        privateStateProvider: {
-          get: async (key: string) => null,
-          set: async (key: string, value: any) => {},
-        },
-        publicDataProvider: {
-          contractStateObservable: (address: string, options: any) => {
-            return new Observable(subscriber => {
-              subscriber.next({ data: {} });
-            });
-          }
-        },
-        zkConfigProvider: {},
-        proofProvider: {},
-        walletProvider: {},
-        midnightProvider: {
-          submitTx: async (tx: any) => {
-            this.logger.info('Using mock transaction signing...');
-            return 'mock-tx-id';
-          }
-        },
-      };
+      this.logger.error('❌ Failed to connect to Lace wallet:', error);
+      throw error; // Don't fall back to mock - we want real wallet interaction
     }
   }
 
@@ -225,57 +216,45 @@ export class BrowserSilentLoanCircleManager implements DeployedCircleAPIProvider
     }
   }
 
-  private async connectToWallet(): Promise<any> {
-    this.logger.info('Attempting to connect to Midnight Lace wallet...');
+  private async connectToWallet(): Promise<{ wallet: DAppConnectorWalletAPI; uris: ServiceUriConfig }> {
+    this.logger.info('🔍 Checking for Midnight Lace wallet...');
     
-    // Check if Midnight Lace wallet is available
-    if (!window.midnight?.mnLace) {
-      throw new Error('Midnight Lace wallet not found. Please install the extension.');
-    }
-
-    const connectorAPI = window.midnight.mnLace;
-    
-    // Check API version compatibility
-    const COMPATIBLE_VERSION = '1.x';
-    if (!semver.satisfies(connectorAPI.apiVersion, COMPATIBLE_VERSION)) {
-      throw new Error(`Incompatible wallet version. Required: ${COMPATIBLE_VERSION}, Found: ${connectorAPI.apiVersion}`);
-    }
-
-    this.logger.info('Compatible Midnight Lace wallet found, connecting...');
-
-    // Check if wallet is enabled
-    const isEnabled = await connectorAPI.isEnabled();
-    if (!isEnabled) {
-      this.logger.info('Wallet not enabled, requesting permission...');
-    }
-
-    // Enable the wallet (this will prompt user if needed)
-    const walletAPI = await connectorAPI.enable();
-    
-    // Get service configuration
-    const uris = await connectorAPI.getServiceUriConfig();
-    
-    this.logger.info('Successfully connected to Midnight Lace wallet');
-
-    return {
-      wallet: {
-        state: () => walletAPI.state(),
-        getBalanceInfo: (query: any) => walletAPI.getBalanceInfo(query),
-        submitTransaction: async (tx: any) => {
-          this.logger.info('🔐 Prompting wallet to sign transaction...');
-          
-          // This is where the wallet signing popup will appear
-          const result = await walletAPI.submitTransaction(tx);
-          
-          this.logger.info('✅ Transaction signed successfully:', result);
-          return result;
-        }
-      },
-      uris: {
-        indexer: uris.indexer,
-        zkConfigProvider: uris.zkConfigProvider,
-        proverServer: uris.proverServer
+    return new Promise((resolve, reject) => {
+      // Check if Midnight Lace wallet is available
+      if (!window.midnight?.mnLace) {
+        reject(new Error('❌ Midnight Lace wallet not found. Please install the Lace wallet extension from https://www.lace.io'));
+        return;
       }
-    };
+
+      const connectorAPI: DAppConnectorAPI = window.midnight.mnLace;
+      this.logger.info('✅ Midnight Lace wallet detected!');
+      
+      // Check API version compatibility
+      const COMPATIBLE_VERSION = '1.x';
+      if (!semver.satisfies(connectorAPI.apiVersion, COMPATIBLE_VERSION)) {
+        reject(new Error(`❌ Incompatible wallet version. Required: ${COMPATIBLE_VERSION}, Found: ${connectorAPI.apiVersion}`));
+        return;
+      }
+
+      this.logger.info('🔗 Compatible Midnight Lace wallet found, requesting connection...');
+
+      // This is the key part - enable() will show the Lace wallet popup
+      connectorAPI.enable()
+        .then(async (walletAPI: DAppConnectorWalletAPI) => {
+          this.logger.info('🎉 Wallet connection approved by user!');
+          
+          // Get service configuration
+          const uris = await connectorAPI.getServiceUriConfig();
+          
+          resolve({
+            wallet: walletAPI,
+            uris: uris
+          });
+        })
+        .catch((error) => {
+          this.logger.error('❌ Wallet connection failed:', error);
+          reject(new Error(`Failed to connect to Midnight Lace wallet: ${error.message}`));
+        });
+    });
   }
 }
