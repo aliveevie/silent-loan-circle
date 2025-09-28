@@ -1,0 +1,209 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Silent Loan Circle - Modern Fintech Design System
+Night-themed professional aesthetic with blue/teal gradients
+All colors MUST be HSL.
+*/
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    /* Core Colors - Midnight Theme */
+    --background: 225 25% 97%;
+    --foreground: 225 15% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 225 15% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 225 15% 15%;
+
+    /* Primary - Deep Midnight Blue */
+    --primary: 225 45% 20%;
+    --primary-foreground: 210 40% 98%;
+    --primary-hover: 225 45% 25%;
+
+    /* Secondary - Soft Teal Accent */
+    --secondary: 185 70% 45%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-hover: 185 70% 40%;
+
+    /* Muted Tones */
+    --muted: 225 15% 95%;
+    --muted-foreground: 225 10% 45%;
+
+    /* Accent - Bright Teal */
+    --accent: 180 85% 55%;
+    --accent-foreground: 225 45% 20%;
+
+    /* Status Colors */
+    --success: 145 65% 50%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 90% 60%;
+    --warning-foreground: 225 45% 20%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* UI Elements */
+    --border: 225 20% 88%;
+    --input: 225 20% 88%;
+    --ring: 180 85% 55%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(225, 45%, 20%), hsl(185, 70%, 45%));
+    --gradient-hero: linear-gradient(135deg, hsl(225, 45%, 15%), hsl(225, 45%, 25%), hsl(185, 70%, 40%));
+    --gradient-card: linear-gradient(145deg, hsl(0, 0%, 100%), hsl(225, 25%, 98%));
+
+    /* Shadows */
+    --shadow-soft: 0 4px 20px hsl(225, 15%, 15% / 0.08);
+    --shadow-medium: 0 8px 40px hsl(225, 15%, 15% / 0.12);
+    --shadow-strong: 0 20px 60px hsl(225, 15%, 15% / 0.15);
+
+    /* Radius */
+    --radius: 1rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Dark Mode - Enhanced Night Theme */
+    --background: 225 45% 8%;
+    --foreground: 210 40% 95%;
+
+    --card: 225 40% 12%;
+    --card-foreground: 210 40% 95%;
+
+    --popover: 225 40% 12%;
+    --popover-foreground: 210 40% 95%;
+
+    /* Primary - Bright in Dark Mode */
+    --primary: 180 85% 55%;
+    --primary-foreground: 225 45% 8%;
+    --primary-hover: 180 85% 50%;
+
+    /* Secondary - Muted Teal */
+    --secondary: 185 50% 35%;
+    --secondary-foreground: 210 40% 95%;
+    --secondary-hover: 185 50% 40%;
+
+    /* Muted Dark Tones */
+    --muted: 225 30% 15%;
+    --muted-foreground: 225 15% 65%;
+
+    /* Accent */
+    --accent: 185 70% 45%;
+    --accent-foreground: 225 45% 8%;
+
+    /* Status Colors - Dark Mode */
+    --success: 145 60% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 85% 55%;
+    --warning-foreground: 225 45% 8%;
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* UI Elements */
+    --border: 225 25% 20%;
+    --input: 225 25% 20%;
+    --ring: 180 85% 55%;
+
+    /* Dark Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(225, 45%, 15%), hsl(185, 70%, 35%));
+    --gradient-hero: linear-gradient(135deg, hsl(225, 45%, 5%), hsl(225, 45%, 15%), hsl(185, 70%, 25%));
+    --gradient-card: linear-gradient(145deg, hsl(225, 40%, 12%), hsl(225, 35%, 15%));
+
+    /* Dark Shadows */
+    --shadow-soft: 0 4px 20px hsl(0, 0%, 0% / 0.25);
+    --shadow-medium: 0 8px 40px hsl(0, 0%, 0% / 0.35);
+    --shadow-strong: 0 20px 60px hsl(0, 0%, 0% / 0.45);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-inter antialiased;
+    font-feature-settings: 'cv03', 'cv04', 'cv11';
+  }
+
+  /* Custom Utility Classes */
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .gradient-card {
+    background: var(--gradient-card);
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-medium {
+    box-shadow: var(--shadow-medium);
+  }
+
+  .shadow-strong {
+    box-shadow: var(--shadow-strong);
+  }
+
+  /* Smooth Transitions */
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Custom Animations */
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-fade-up {
+    animation: fade-up 0.6s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.4s ease-out;
+  }
+}
