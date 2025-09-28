@@ -129,19 +129,36 @@ export class SilentLoanCircleAPI implements DeployedSilentLoanCircleAPI {
     logger?.info('Deploying Silent Loan Circle contract...');
     
     try {
-      // Create a mock transaction for the wallet to sign
+      // Create a properly formatted transaction for the Lace wallet
       const deploymentTransaction = {
-        type: 'deployment',
-        contractType: 'SilentLoanCircle',
-        configuration: {
-          maxMembers: Number(configuration.maxMembers),
-          contributionAmount: configuration.contributionAmount.toString(),
-          interestRate: configuration.interestRate.toString(),
-          cycleDurationBlocks: configuration.cycleDurationBlocks.toString()
+        // Transaction metadata
+        metadata: {
+          type: 'deployment',
+          contractType: 'SilentLoanCircle',
+          description: `Deploy Silent Loan Circle with ${configuration.maxMembers} members`,
+          timestamp: Date.now()
         },
-        timestamp: Date.now(),
-        gasLimit: 100000n,
-        fee: 1000n
+        
+        // Contract deployment data
+        data: {
+          contractType: 'SilentLoanCircle',
+          initParams: {
+            maxMembers: Number(configuration.maxMembers),
+            contributionAmount: configuration.contributionAmount.toString(),
+            interestRate: configuration.interestRate.toString(),
+            cycleDurationBlocks: configuration.cycleDurationBlocks.toString()
+          }
+        },
+        
+        // Transaction fees and limits
+        gasLimit: 100000,
+        fee: 1000,
+        
+        // Network info
+        networkId: 'testnet', // or 'mainnet'
+        
+        // Transaction value (for contract deployment)
+        value: 0
       };
 
       logger?.info('Submitting deployment transaction to wallet for signing...');
