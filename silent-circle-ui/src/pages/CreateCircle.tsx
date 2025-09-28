@@ -1,15 +1,20 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { useToast } from "@/hooks/use-toast";
-import { ArrowRight, ArrowLeft, Users, DollarSign, Calendar, Shield } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { ArrowRight, ArrowLeft, Users, DollarSign, Calendar, Shield, Loader2 } from "lucide-react";
+import { useSilentLoanCircleContext } from "@/hooks/useSilentLoanCircleContext";
+import { useWallet } from "@/contexts/WalletContext";
+import { type CircleConfiguration } from "@/api/common-types";
 
 export default function CreateCircle() {
   const [step, setStep] = useState(1);
+  const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
     circleName: "",
     contributionAmount: "",
@@ -18,6 +23,9 @@ export default function CreateCircle() {
     description: "",
   });
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const circleApiProvider = useSilentLoanCircleContext();
+  const { isConnected, connect, address } = useWallet();
 
   const totalSteps = 3;
   const progress = (step / totalSteps) * 100;
@@ -38,20 +46,113 @@ export default function CreateCircle() {
     }
   };
 
-  const handleSubmit = () => {
-    toast({
-      title: "Circle Created Successfully!",
-      description: `${formData.circleName} has been created and is ready for members to join.`,
-    });
-    // Reset form or redirect
-    setFormData({
-      circleName: "",
-      contributionAmount: "",
-      cycleDuration: "",
-      maxMembers: "",
-      description: "",
-    });
-    setStep(1);
+  const handleSubmit = async () => {
+    // Check if wallet is connected first
+    if (!isConnected) {
+      toast({
+        title: "Wallet Required",
+        description: "Please connect your Midnight Lace wallet to create a circle.",
+        variant: "destructive",
+      });
+      
+      try {
+        await connect();
+      } catch (error) {
+        toast({
+          title: "Connection Failed",
+          description: "Failed to connect to wallet. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    setIsCreating(true);
+
+    try {
+      // Create circle configuration from form data
+      const configuration: CircleConfiguration = {
+        maxMembers: parseInt(formData.maxMembers),
+        contributionAmount: BigInt(parseInt(formData.contributionAmount) * 1000000), // Convert to smallest unit
+        interestRate: 500n, // 5% default interest rate
+        cycleDurationBlocks: getCycleDurationInBlocks(formData.cycleDuration),
+      };
+
+      toast({
+        title: "Creating Circle...",
+        description: "Please sign the transaction in your Midnight Lace wallet.",
+      });
+
+      // This will prompt the wallet to sign the transaction
+      const circleDeployment = circleApiProvider.resolve(undefined, configuration);
+
+      // Subscribe to the deployment to track progress
+      circleDeployment.subscribe({
+        next: (deployment) => {
+          if (deployment.status === 'deployed') {
+            toast({
+              title: "Circle Created Successfully! 🎉",
+              description: `${formData.circleName} has been deployed and is ready for members to join.`,
+            });
+            
+            // Reset form and navigate to dashboard
+            setFormData({
+              circleName: "",
+              contributionAmount: "",
+              cycleDuration: "",
+              maxMembers: "",
+              description: "",
+            });
+            setStep(1);
+            setIsCreating(false);
+            
+            // Navigate to dashboard to see the new circle
+            navigate('/dashboard');
+          } else if (deployment.status === 'failed') {
+            throw new Error(deployment.error.message);
+          }
+        },
+        error: (error) => {
+          console.error('Circle creation failed:', error);
+          toast({
+            title: "Creation Failed",
+            description: error.message || "Failed to create circle. Please try again.",
+            variant: "destructive",
+          });
+          setIsCreating(false);
+        }
+      });
+
+    } catch (error: any) {
+      console.error('Circle creation error:', error);
+      toast({
+        title: "Creation Failed",
+        description: error.message || "Failed to create circle. Please try again.",
+        variant: "destructive",
+      });
+      setIsCreating(false);
+    }
+  };
+
+  // Helper function to convert cycle duration to blocks
+  const getCycleDurationInBlocks = (duration: string): bigint => {
+    const blocksPerMinute = 10n; // Approximate blocks per minute on Midnight
+    const minutesPerHour = 60n;
+    const hoursPerDay = 24n;
+    const daysPerWeek = 7n;
+    
+    switch (duration) {
+      case 'weekly':
+        return blocksPerMinute * minutesPerHour * hoursPerDay * daysPerWeek;
+      case 'biweekly':
+        return blocksPerMinute * minutesPerHour * hoursPerDay * daysPerWeek * 2n;
+      case 'monthly':
+        return blocksPerMinute * minutesPerHour * hoursPerDay * 30n;
+      case 'quarterly':
+        return blocksPerMinute * minutesPerHour * hoursPerDay * 90n;
+      default:
+        return 1000n; // Default to 1000 blocks
+    }
   };
 
   const isStepValid = () => {
@@ -75,6 +176,23 @@ export default function CreateCircle() {
           <p className="text-lg text-muted-foreground">
             Set up your privacy-preserving savings circle in just a few steps
           </p>
+          
+          {/* Wallet Status */}
+          {!isConnected && (
+            <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                ⚠️ Midnight Lace wallet required to create a circle. You'll be prompted to connect when ready.
+              </p>
+            </div>
+          )}
+          
+          {isConnected && address && (
+            <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+              <p className="text-sm text-green-800 dark:text-green-200">
+                ✅ Wallet connected: {address.slice(0, 6)}...{address.slice(-4)}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Progress Bar */}
@@ -222,11 +340,20 @@ export default function CreateCircle() {
             ) : (
               <Button
                 onClick={handleSubmit}
-                disabled={!isStepValid()}
+                disabled={!isStepValid() || isCreating}
                 className="flex items-center gap-2"
               >
-                Create Circle
-                <Shield className="h-4 w-4" />
+                {isCreating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Creating Circle...
+                  </>
+                ) : (
+                  <>
+                    Create Circle
+                    <Shield className="h-4 w-4" />
+                  </>
+                )}
               </Button>
             )}
           </CardFooter>
