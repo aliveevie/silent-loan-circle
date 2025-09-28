@@ -213,8 +213,8 @@ export default function ManageCircle() {
     try {
       // Generate invitation token and link
       const invitationToken = `inv_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-      const currentUrl = window.location.origin;
-      const invitationLink = `${currentUrl}/join/${circleInfo.id}?token=${invitationToken}&inviter=${address || 'unknown'}`;
+      const baseUrl = 'https://silent-circle-loan.vercel.app';
+      const invitationLink = `${baseUrl}/join/${circleInfo.id}?token=${invitationToken}&inviter=${address || 'unknown'}`;
 
       // Store the invitation in localStorage for validation
       const invitations = JSON.parse(localStorage.getItem('circleInvitations') || '{}');
