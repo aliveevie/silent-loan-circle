@@ -114,22 +114,49 @@ export default function CreateCircle() {
         },
         error: (error) => {
           console.error('Circle creation failed:', error);
-          toast({
-            title: "Creation Failed",
-            description: error.message || "Failed to create circle. Please try again.",
-            variant: "destructive",
-          });
+          const errorMessage = error.message || "Failed to create circle. Please try again.";
+          
+          // Handle specific wallet errors more gracefully for hackathon
+          if (errorMessage.includes('user rejected') || errorMessage.includes('User cancelled') || errorMessage.includes('rejected')) {
+            toast({
+              title: "❌ Transaction Cancelled",
+              description: "You cancelled the transaction in your Lace wallet. Please try again if you want to create the circle.",
+              variant: "destructive",
+            });
+          } else if (errorMessage.includes('extension') || errorMessage.includes('wallet') || errorMessage.includes('not found')) {
+            toast({
+              title: "❌ Wallet Connection Error",
+              description: "Please check that your Lace wallet extension is properly installed and enabled, then try again.",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "❌ Creation Failed",
+              description: errorMessage,
+              variant: "destructive",
+            });
+          }
           setIsCreating(false);
         }
       });
 
     } catch (error: any) {
       console.error('Circle creation error:', error);
-      toast({
-        title: "Creation Failed",
-        description: error.message || "Failed to create circle. Please try again.",
-        variant: "destructive",
-      });
+      const errorMessage = error.message || "Failed to create circle. Please try again.";
+      
+      if (errorMessage.includes('Connect wallet first')) {
+        toast({
+          title: "❌ Wallet Not Connected",
+          description: "Please connect your Lace wallet first before creating a circle.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "❌ Creation Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
       setIsCreating(false);
     }
   };

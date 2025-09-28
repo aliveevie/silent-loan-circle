@@ -48,31 +48,32 @@ export const WalletTester: React.FC = () => {
       return;
     }
 
-    setMessage('Creating test transaction...');
+    setMessage('🔐 Wallet will show transaction approval popup...');
     
     try {
       const walletAPI = await window.midnight.mnLace.enable();
       
-      // Create a test transaction
+      // Create a mock balanced transaction (this is what the wallet expects)
       const testTx = {
-        type: 'test',
-        description: 'Test transaction from Silent Loan Circle',
-        value: 0,
-        gasLimit: 50000,
-        fee: 500,
-        timestamp: Date.now()
+        serialize: () => new Uint8Array([1, 2, 3, 4]), // Mock serialized transaction
+        networkId: 'testnet',
+        type: 'test'
       };
 
-      setMessage('🔐 Sending to wallet for approval...');
+      setMessage('📝 Sending transaction to Lace wallet...');
       
       // This should show the Lace wallet transaction approval popup
       const result = await walletAPI.submitTransaction(testTx);
       
-      setMessage(`✅ Transaction approved! TX: ${result}`);
-      console.log('Transaction result:', result);
+      setMessage(`✅ Transaction approved and submitted! TX: ${result}`);
+      console.log('🎉 Transaction result:', result);
       
     } catch (error: any) {
-      setMessage(`❌ Transaction failed: ${error.message}`);
+      if (error.message.includes('User rejected')) {
+        setMessage('❌ Transaction rejected by user');
+      } else {
+        setMessage(`❌ Transaction failed: ${error.message}`);
+      }
       console.error('Transaction error:', error);
     }
   };

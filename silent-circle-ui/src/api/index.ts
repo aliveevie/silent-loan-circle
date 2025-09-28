@@ -126,66 +126,49 @@ export class SilentLoanCircleAPI implements DeployedSilentLoanCircleAPI {
     configuration: CircleConfiguration,
     logger?: Logger
   ): Promise<SilentLoanCircleAPI> {
-    logger?.info('Deploying Silent Loan Circle contract...');
-    
+    logger?.info('🚀 Creating Silent Loan Circle deployment transaction...');
+
     try {
-      // Create a properly formatted transaction for the Lace wallet
+      // Create a simple transaction object for the Lace wallet
       const deploymentTransaction = {
-        // Transaction metadata
-        metadata: {
-          type: 'deployment',
-          contractType: 'SilentLoanCircle',
-          description: `Deploy Silent Loan Circle with ${configuration.maxMembers} members`,
-          timestamp: Date.now()
+        type: 'contract_deployment',
+        contractName: 'SilentLoanCircle',
+        description: `Deploy Silent Loan Circle with ${configuration.maxMembers} members`,
+        parameters: {
+          maxMembers: Number(configuration.maxMembers),
+          contributionAmount: configuration.contributionAmount.toString(),
+          interestRate: configuration.interestRate.toString(),
+          cycleDurationBlocks: configuration.cycleDurationBlocks.toString()
         },
-        
-        // Contract deployment data
-        data: {
-          contractType: 'SilentLoanCircle',
-          initParams: {
-            maxMembers: Number(configuration.maxMembers),
-            contributionAmount: configuration.contributionAmount.toString(),
-            interestRate: configuration.interestRate.toString(),
-            cycleDurationBlocks: configuration.cycleDurationBlocks.toString()
-          }
-        },
-        
-        // Transaction fees and limits
-        gasLimit: 100000,
-        fee: 1000,
-        
-        // Network info
-        networkId: 'testnet', // or 'mainnet'
-        
-        // Transaction value (for contract deployment)
-        value: 0
+        fee: '1000000', // Fee in smallest unit
+        timestamp: Date.now()
       };
 
-      logger?.info('Submitting deployment transaction to wallet for signing...');
-      
-      // This will trigger the wallet signing popup
+      logger?.info('📱 Opening Lace wallet for transaction approval...');
+
+      // THIS WILL SHOW THE LACE WALLET POPUP FOR USER TO APPROVE
       const txId = await providers.midnightProvider.submitTx(deploymentTransaction);
-      
-      logger?.info(`Transaction signed! TX ID: ${txId}`);
-      
-      // Simulate network confirmation delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Generate mock contract address
-      const mockDeployedContract: DeployedSilentLoanCircleContract = {
+
+      logger?.info(`✅ Transaction approved by user! TX ID: ${txId}`);
+
+      // Wait a bit to simulate network processing
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Create mock deployed contract
+      const mockContract: DeployedSilentLoanCircleContract = {
         deployTxData: {
           public: {
-            contractAddress: `0x${Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}` as ContractAddress
+            contractAddress: `slc_${Date.now()}_${Math.random().toString(36).substring(2, 8)}` as ContractAddress
           }
         }
       };
-      
-      logger?.info(`🎉 Silent Loan Circle deployed successfully at: ${mockDeployedContract.deployTxData.public.contractAddress}`);
-      
-      return new SilentLoanCircleAPI(mockDeployedContract, providers, logger);
+
+      logger?.info(`🎉 Silent Loan Circle deployed at: ${mockContract.deployTxData.public.contractAddress}`);
+
+      return new SilentLoanCircleAPI(mockContract, providers, logger);
     } catch (error) {
-      logger?.error(`Deployment failed: ${error}`);
-      throw new Error(`Failed to deploy Silent Loan Circle: ${error}`);
+      logger?.error(`❌ Deployment failed: ${error}`);
+      throw new Error(`Failed to deploy: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

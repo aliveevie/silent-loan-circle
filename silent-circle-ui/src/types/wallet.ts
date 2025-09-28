@@ -25,3 +25,6 @@ declare global {
     };
   }
 }
+
+// Re-export for convenience
+export {};

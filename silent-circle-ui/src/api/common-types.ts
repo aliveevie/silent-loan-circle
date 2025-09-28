@@ -101,8 +101,14 @@ export interface SilentLoanCircleProviders {
   publicDataProvider: any;
   zkConfigProvider: any;
   proofProvider: any;
-  walletProvider: any;
-  midnightProvider: any;
+  walletProvider: {
+    coinPublicKey: Uint8Array;
+    encryptionPublicKey: Uint8Array;
+    balanceTx: (tx: any, newCoins: any[]) => Promise<any>;
+  };
+  midnightProvider: {
+    submitTx: (tx: any) => Promise<any>;
+  };
 }
 
 /**
