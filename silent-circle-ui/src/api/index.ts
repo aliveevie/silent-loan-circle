@@ -3,12 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Observable, BehaviorSubject, combineLatest, map, tap, from } from 'rxjs';
-import { type ContractAddress } from '@midnight-ntwrk/compact-runtime';
 import { type Logger } from 'pino';
-import { deployContract, findDeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
-import { toHex } from '@midnight-ntwrk/midnight-js-utils';
 
 import {
+  type ContractAddress,
   type SilentLoanCircleDerivedState,
   type SilentLoanCircleProviders,
   type DeployedSilentLoanCircleContract,
@@ -106,29 +104,18 @@ export class SilentLoanCircleAPI implements DeployedSilentLoanCircleAPI {
     this.deployedContractAddress = deployedContract.deployTxData.public.contractAddress;
     this.contractInstance = new mockContractModule.Contract(mockWitnesses);
     
-    // Create observable state by combining public and private state
-    this.state$ = combineLatest([
-      // Public state from the ledger
-      providers.publicDataProvider.contractStateObservable(this.deployedContractAddress, { type: 'latest' }).pipe(
-        map((contractState) => mockContractModule.ledger(contractState.data)),
-        tap((ledgerState) =>
-          logger?.trace({
-            ledgerStateChanged: {
-              circleState: ledgerState.circleState,
-              memberCount: ledgerState.memberCount,
-              currentCycle: ledgerState.currentCycleIndex
-            }
-          })
-        )
-      ),
+    // Create a mock observable state for development
+    this.state$ = new Observable<SilentLoanCircleDerivedState>(subscriber => {
+      const mockState = this.createMockDerivedState();
+      subscriber.next(mockState);
       
-      // Private state
-      from(providers.privateStateProvider.get(silentLoanCirclePrivateStateKey)).pipe(
-        map((privateState) => privateState || this.createInitialPrivateState())
-      )
-    ]).pipe(
-      map(([publicState, privateState]) => this.deriveCombinedState(publicState, privateState))
-    );
+      // Simulate state updates every 10 seconds
+      const interval = setInterval(() => {
+        subscriber.next(mockState);
+      }, 10000);
+      
+      return () => clearInterval(interval);
+    });
   }
 
   /**
@@ -314,44 +301,29 @@ export class SilentLoanCircleAPI implements DeployedSilentLoanCircleAPI {
     }
   }
 
-  private createInitialPrivateState() {
-    return {
-      secretKey: new Uint8Array(32),
-      membershipProof: new Uint8Array(32),
-      contributionHistory: [],
-      payoutHistory: [],
-      isAdmin: false
+  private createMockDerivedState(): SilentLoanCircleDerivedState {
+    const mockPublicState = {
+      circleState: CircleState.JOINING,
+      memberCount: 3,
+      maxMembers: 10,
+      contributionAmount: 1000n,
+      currentCycleIndex: 0,
+      payoutPointer: 0,
+      interestRate: 500n,
+      adminAddress: new Uint8Array(32)
     };
-  }
 
-  private deriveCombinedState(publicState: any, privateState: any): SilentLoanCircleDerivedState {
     return {
-      state: publicState,
+      state: mockPublicState,
       sequence: 0n,
-      isMember: privateState.membershipProof.length > 0,
-      isAdmin: privateState.isAdmin,
-      hasContributed: privateState.contributionHistory.length > 0,
-      canReceivePayout: this.calculatePayoutEligibility(publicState, privateState),
-      totalContributions: this.calculateTotalContributions(privateState),
-      expectedPayout: this.calculateExpectedPayout(publicState),
-      remainingCycles: Math.max(0, publicState.maxMembers - publicState.currentCycleIndex)
+      isMember: false,
+      isAdmin: true,
+      hasContributed: false,
+      canReceivePayout: false,
+      totalContributions: 0n,
+      expectedPayout: 10500n, // 10 * 1000 + 5% interest
+      remainingCycles: 10
     };
-  }
-
-  private calculatePayoutEligibility(publicState: any, privateState: any): boolean {
-    return privateState.contributionHistory.length > 0 && 
-           privateState.payoutHistory.length === 0 &&
-           publicState.circleState === CircleState.ACTIVE;
-  }
-
-  private calculateTotalContributions(privateState: any): bigint {
-    return privateState.contributionHistory.reduce((sum: bigint, amount: bigint) => sum + amount, 0n);
-  }
-
-  private calculateExpectedPayout(publicState: any): bigint {
-    const baseAmount = publicState.contributionAmount * BigInt(publicState.maxMembers);
-    const interest = (baseAmount * publicState.interestRate) / 10000n; // basis points
-    return baseAmount + interest;
   }
 
   private generateMockTxId(): string {
