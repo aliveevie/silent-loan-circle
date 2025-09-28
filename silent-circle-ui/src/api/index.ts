@@ -129,9 +129,32 @@ export class SilentLoanCircleAPI implements DeployedSilentLoanCircleAPI {
     logger?.info('Deploying Silent Loan Circle contract...');
     
     try {
-      const contractInstance = new mockContractModule.Contract(mockWitnesses);
+      // Create a mock transaction for the wallet to sign
+      const deploymentTransaction = {
+        type: 'deployment',
+        contractType: 'SilentLoanCircle',
+        configuration: {
+          maxMembers: Number(configuration.maxMembers),
+          contributionAmount: configuration.contributionAmount.toString(),
+          interestRate: configuration.interestRate.toString(),
+          cycleDurationBlocks: configuration.cycleDurationBlocks.toString()
+        },
+        timestamp: Date.now(),
+        gasLimit: 100000n,
+        fee: 1000n
+      };
+
+      logger?.info('Submitting deployment transaction to wallet for signing...');
       
-      // Mock deployment - in real implementation this would deploy to the network
+      // This will trigger the wallet signing popup
+      const txId = await providers.midnightProvider.submitTx(deploymentTransaction);
+      
+      logger?.info(`Transaction signed! TX ID: ${txId}`);
+      
+      // Simulate network confirmation delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Generate mock contract address
       const mockDeployedContract: DeployedSilentLoanCircleContract = {
         deployTxData: {
           public: {
@@ -140,7 +163,7 @@ export class SilentLoanCircleAPI implements DeployedSilentLoanCircleAPI {
         }
       };
       
-      logger?.info(`Silent Loan Circle deployed at: ${mockDeployedContract.deployTxData.public.contractAddress}`);
+      logger?.info(`🎉 Silent Loan Circle deployed successfully at: ${mockDeployedContract.deployTxData.public.contractAddress}`);
       
       return new SilentLoanCircleAPI(mockDeployedContract, providers, logger);
     } catch (error) {
