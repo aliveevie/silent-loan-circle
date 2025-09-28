@@ -53,7 +53,7 @@ class WalletService {
       interval(100).pipe(
         map(() => window.midnight?.mnLace),
         tap((connectorAPI) => {
-          console.log('Checking for wallet connector API:', !!connectorAPI);
+          console.log('🔍 Checking for Midnight Lace wallet...', !!connectorAPI);
         }),
         filter((connectorAPI): connectorAPI is DAppConnectorAPI => !!connectorAPI),
         concatMap((connectorAPI) =>
@@ -66,30 +66,34 @@ class WalletService {
               )
         ),
         tap(() => {
-          console.log('Compatible wallet connector API found. Connecting.');
+          console.log('✅ Compatible Midnight Lace wallet found. Connecting...');
         }),
         take(1),
         timeout({
           first: 10_000,
           with: () =>
-            throwError(() => new Error('Could not find Midnight Lace wallet. Extension installed?'))
+            throwError(() => new Error('❌ Could not find Midnight Lace wallet. Please install the extension and try again.'))
         }),
         concatMap(async (connectorAPI) => {
           const isEnabled = await connectorAPI.isEnabled();
-          console.log('Wallet connector API enabled status:', isEnabled);
+          console.log('🔐 Wallet enabled status:', isEnabled);
+          if (!isEnabled) {
+            console.log('🔓 Requesting wallet permission...');
+          }
           return connectorAPI;
         }),
         timeout({
-          first: 5_000,
+          first: 15_000, // Increased timeout for user interaction
           with: () =>
-            throwError(() => new Error('Midnight Lace wallet has failed to respond. Extension enabled?'))
+            throwError(() => new Error('❌ Midnight Lace wallet failed to respond. Please check if the extension is enabled.'))
         }),
-        concatMap(async (connectorAPI) => ({ 
-          walletConnectorAPI: await connectorAPI.enable(), 
-          connectorAPI 
-        })),
+        concatMap(async (connectorAPI) => {
+          console.log('🚀 Enabling wallet connection...');
+          const walletConnectorAPI = await connectorAPI.enable();
+          return { walletConnectorAPI };
+        }),
         concatMap(async ({ walletConnectorAPI }) => {
-          console.log('Connected to wallet connector API');
+          console.log('🎉 Successfully connected to Midnight Lace wallet!');
           return { wallet: walletConnectorAPI };
         })
       )
