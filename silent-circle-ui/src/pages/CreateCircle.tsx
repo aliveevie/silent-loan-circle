@@ -79,11 +79,11 @@ export default function CreateCircle() {
       };
 
       toast({
-        title: "Creating Circle...",
-        description: "Please sign the transaction in your Midnight Lace wallet.",
+        title: "🔐 Wallet Approval Required",
+        description: "Please check your Lace wallet and approve the transaction to create the circle.",
       });
 
-      // This will prompt the wallet to sign the transaction
+      // This will trigger the Lace wallet popup for transaction approval
       const circleDeployment = circleApiProvider.resolve(undefined, configuration);
 
       // Subscribe to the deployment to track progress
@@ -310,6 +310,20 @@ export default function CreateCircle() {
                     <div>
                       <span className="text-muted-foreground">Max Members:</span>
                       <p className="font-medium">{formData.maxMembers || "Not set"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Wallet Transaction Notice */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium text-blue-900 dark:text-blue-100">Wallet Approval Required</h4>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                        Clicking "Create Circle" will open your Lace wallet to approve the contract deployment transaction. 
+                        This ensures secure, decentralized creation of your Silent Loan Circle.
+                      </p>
                     </div>
                   </div>
                 </div>
