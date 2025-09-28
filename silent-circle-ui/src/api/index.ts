@@ -99,7 +99,8 @@ export class SilentLoanCircleAPI implements DeployedSilentLoanCircleAPI {
   constructor(
     private readonly deployedContract: DeployedSilentLoanCircleContract,
     private readonly providers: SilentLoanCircleProviders,
-    private readonly logger?: Logger
+    private readonly logger?: Logger,
+    public readonly configuration?: CircleConfiguration
   ) {
     this.deployedContractAddress = deployedContract.deployTxData.public.contractAddress;
     this.contractInstance = new mockContractModule.Contract(mockWitnesses);
@@ -165,9 +166,9 @@ export class SilentLoanCircleAPI implements DeployedSilentLoanCircleAPI {
         }
       };
 
-      logger?.info(`🎉 Silent Loan Circle deployed at: ${deployedContract.deployTxData.public.contractAddress}`);
+            logger?.info(`🎉 Silent Loan Circle deployed at: ${deployedContract.deployTxData.public.contractAddress}`);
 
-      return new SilentLoanCircleAPI(deployedContract, providers, logger);
+            return new SilentLoanCircleAPI(deployedContract, providers, logger, configuration);
     } catch (error) {
       logger?.error(`❌ Deployment failed: ${error}`);
       throw new Error(`Failed to deploy: ${error instanceof Error ? error.message : String(error)}`);

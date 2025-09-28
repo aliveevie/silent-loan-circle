@@ -77,9 +77,57 @@ export default function Dashboard() {
     { id: 5, name: "You", avatar: "", initials: "YU", status: "contributed" as const, isNext: false },
   ];
 
+  // State for created circles with localStorage persistence
+  const [createdCircles, setCreatedCircles] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('userCreatedCircles');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
   // Effect to subscribe to circle deployments
   useEffect(() => {
-    const subscription = circleApiProvider.circleDeployments$.subscribe(setCircleDeployments);
+    const subscription = circleApiProvider.circleDeployments$.subscribe((deployments) => {
+      setCircleDeployments(deployments);
+      
+      // Convert deployed circles to display format
+      const newCreatedCircles: any[] = [];
+      deployments.forEach((deployment, index) => {
+        deployment.subscribe({
+          next: (circle) => {
+            if (circle.status === 'deployed' && circle.api) {
+              const config = circle.api.configuration;
+              const circleData = {
+                id: circle.api.deployedContractAddress || `created-${Date.now()}-${index}`,
+                name: config?.circleName || `My Circle #${index + 1}`,
+                description: config?.description || 'Newly created savings circle',
+                contributionAmount: config?.contributionAmount ? (Number(config.contributionAmount) / 1000000).toFixed(2) : '100.00',
+                currentMembers: 1, // Starting with creator
+                maxMembers: config?.maxMembers || 10,
+                cycleDuration: config?.cycleDurationBlocks ? `${Math.round(Number(config.cycleDurationBlocks) / 144)} days` : '30 days', // Convert BigInt to Number first
+                status: 'active' as const,
+                isCreated: true // Flag to identify created circles
+              };
+              
+              // Add to created circles if not already there
+              setCreatedCircles(prev => {
+                const exists = prev.some(c => c.id === circleData.id);
+                if (!exists) {
+                  const newCircles = [...prev, circleData];
+                  // Save to localStorage for persistence
+                  localStorage.setItem('userCreatedCircles', JSON.stringify(newCircles));
+                  return newCircles;
+                }
+                return prev;
+              });
+            }
+          }
+        });
+      });
+    });
+    
     return () => subscription.unsubscribe();
   }, [circleApiProvider]);
 
@@ -105,18 +153,93 @@ export default function Dashboard() {
         {/* Available Circles to Join */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold">Available Circles</h2>
-              <p className="text-muted-foreground">Join an existing savings circle or create your own</p>
-            </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">Your Circles & Available Circles</h2>
+                    <p className="text-muted-foreground">
+                      {createdCircles.length > 0 ? 
+                        `You have ${createdCircles.length} circle${createdCircles.length === 1 ? '' : 's'}. Join more existing circles or create new ones.` :
+                        'Join an existing savings circle or create your own'
+                      }
+                    </p>
+                  </div>
             <Button onClick={() => navigate('/create')} className="flex items-center">
               <Plus className="h-4 w-4 mr-2" />
               Create New Circle
             </Button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {availableCircles.map((circle) => {
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Show created circles first */}
+                  {createdCircles.map((circle) => {
+                    const progressPercentage = (circle.currentMembers / circle.maxMembers) * 100;
+
+                    return (
+                      <Card key={circle.id} className="hover:shadow-lg transition-shadow border-green-200 bg-green-50/50">
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg flex items-center">
+                              {circle.name}
+                              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                                Created by You
+                              </span>
+                            </CardTitle>
+                            <StatusBadge status={circle.status} />
+                          </div>
+                          <CardDescription className="text-sm">
+                            {circle.description}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="flex items-center">
+                                <DollarSign className="h-4 w-4 mr-1" />
+                                {circle.contributionAmount} DUST
+                              </span>
+                              <span className="flex items-center">
+                                <Users className="h-4 w-4 mr-1" />
+                                {circle.currentMembers}/{circle.maxMembers}
+                              </span>
+                            </div>
+
+                            <div>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span>Members</span>
+                                <span>{Math.round(progressPercentage)}%</span>
+                              </div>
+                              <Progress value={progressPercentage} className="h-2" />
+                            </div>
+
+                            <div className="flex items-center text-sm text-muted-foreground">
+                              <Clock className="h-4 w-4 mr-1" />
+                              {circle.cycleDuration} cycle
+                            </div>
+
+                            <div className="flex space-x-2 mt-4">
+                              <Button
+                                onClick={() => navigate(`/contribute/${circle.id}`)}
+                                className="flex-1"
+                                variant="outline"
+                              >
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                View Details
+                              </Button>
+                              <Button
+                                onClick={() => navigate(`/manage/${circle.id}`)}
+                                className="flex-1"
+                                variant="default"
+                              >
+                                Manage
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                  
+                  {/* Show available circles */}
+                  {availableCircles.map((circle) => {
               const progressPercentage = (circle.currentMembers / circle.maxMembers) * 100;
               
               return (

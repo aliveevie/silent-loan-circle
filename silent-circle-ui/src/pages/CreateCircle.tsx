@@ -72,6 +72,8 @@ export default function CreateCircle() {
     try {
       // Create circle configuration from form data
       const configuration: CircleConfiguration = {
+        circleName: formData.circleName,
+        description: formData.description,
         maxMembers: parseInt(formData.maxMembers),
         contributionAmount: BigInt(parseInt(formData.contributionAmount) * 1000000), // Convert to smallest unit
         interestRate: 500n, // 5% default interest rate

@@ -126,6 +126,8 @@ export interface DeployedSilentLoanCircleContract {
  * Configuration for creating a new Silent Loan Circle
  */
 export interface CircleConfiguration {
+  readonly circleName: string;
+  readonly description: string;
   readonly maxMembers: number;
   readonly contributionAmount: bigint;
   readonly interestRate: bigint;
