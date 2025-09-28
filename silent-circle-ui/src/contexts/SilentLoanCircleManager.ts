@@ -16,28 +16,11 @@ import {
   tap, 
   concatMap 
 } from 'rxjs';
-import { type ContractAddress } from '@midnight-ntwrk/compact-runtime';
 import { type Logger } from 'pino';
 import semver from 'semver';
 
 import {
-  type DAppConnectorAPI,
-  type DAppConnectorWalletAPI,
-  type ServiceUriConfig,
-} from '@midnight-ntwrk/dapp-connector-api';
-import { levelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider';
-import { FetchZkConfigProvider } from '@midnight-ntwrk/midnight-js-fetch-zk-config-provider';
-import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
-import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
-import {
-  type BalancedTransaction,
-  type UnbalancedTransaction,
-  createBalancedTx,
-} from '@midnight-ntwrk/midnight-js-types';
-import { type CoinInfo, Transaction, type TransactionId } from '@midnight-ntwrk/ledger';
-import { getLedgerNetworkId, getZswapNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
-
-import {
+  type ContractAddress,
   type SilentLoanCircleProviders,
   type CircleConfiguration,
   silentLoanCirclePrivateStateKey
@@ -134,38 +117,26 @@ export class BrowserSilentLoanCircleManager implements DeployedCircleAPIProvider
   }
 
   private async initializeProviders(): Promise<SilentLoanCircleProviders> {
-    const { wallet, uris } = await this.connectToWallet();
-    const walletState = await wallet.state();
+    this.logger.info('Initializing mock providers for development...');
 
-    this.logger.info(`Connecting to wallet with network ID: ${getLedgerNetworkId()}`);
-
+    // Return mock providers for development
     return {
-      privateStateProvider: levelPrivateStateProvider({
-        stateStoreName: 'silent-loan-circle-private-state'
-      }),
-      publicDataProvider: indexerPublicDataProvider({
-        indexerUri: uris.indexer,
-        fetch,
-      }),
-      zkConfigProvider: new FetchZkConfigProvider(
-        uris.zkConfigProvider,
-        fetch,
-      ),
-      proofProvider: httpClientProofProvider({
-        proverServerUri: uris.proverServer,
-        fetch,
-      }),
-      walletProvider: {
-        coinPublicKey: walletState.coinPublicKey,
-        encryptionPublicKey: walletState.encryptionPublicKey,
-        async getBalanceInfo(query: any): Promise<CoinInfo> {
-          return wallet.getBalanceInfo(query);
-        },
+      privateStateProvider: {
+        get: async (key: string) => null,
+        set: async (key: string, value: any) => {},
       },
+      publicDataProvider: {
+        contractStateObservable: (address: string, options: any) => {
+          return new Observable(subscriber => {
+            subscriber.next({ data: {} });
+          });
+        }
+      },
+      zkConfigProvider: {},
+      proofProvider: {},
+      walletProvider: {},
       midnightProvider: {
-        submitTx(tx: BalancedTransaction): Promise<TransactionId> {
-          return wallet.submitTransaction(tx);
-        },
+        submitTx: async (tx: any) => 'mock-tx-id'
       },
     };
   }
@@ -219,68 +190,20 @@ export class BrowserSilentLoanCircleManager implements DeployedCircleAPIProvider
     }
   }
 
-  private async connectToWallet(): Promise<{ wallet: DAppConnectorWalletAPI; uris: ServiceUriConfig }> {
-    const COMPATIBLE_CONNECTOR_API_VERSION = '1.x';
-
-    return firstValueFrom(
-      interval(100).pipe(
-        map(() => window.midnight?.mnLace),
-        tap((connectorAPI) => {
-          this.logger.info(connectorAPI, 'Check for wallet connector API');
-        }),
-        filter((connectorAPI): connectorAPI is DAppConnectorAPI => !!connectorAPI),
-        concatMap((connectorAPI) =>
-          semver.satisfies(connectorAPI.apiVersion, COMPATIBLE_CONNECTOR_API_VERSION)
-            ? of(connectorAPI)
-            : throwError(() => {
-                this.logger.error(
-                  {
-                    expected: COMPATIBLE_CONNECTOR_API_VERSION,
-                    actual: connectorAPI.apiVersion,
-                  },
-                  'Incompatible version of wallet connector API',
-                );
-
-                return new Error(
-                  `Incompatible version of Midnight Lace wallet found. Require '${COMPATIBLE_CONNECTOR_API_VERSION}', got '${connectorAPI.apiVersion}'.`,
-                );
-              }),
-        ),
-        tap((connectorAPI) => {
-          this.logger.info(connectorAPI, 'Compatible wallet connector API found. Connecting.');
-        }),
-        take(1),
-        timeout({
-          first: 10_000,
-          with: () =>
-            throwError(() => {
-              this.logger.error('Could not find wallet connector API');
-              return new Error('Could not find Midnight Lace wallet. Extension installed?');
-            }),
-        }),
-        concatMap(async (connectorAPI) => {
-          const isEnabled = await connectorAPI.isEnabled();
-          this.logger.info(isEnabled, 'Wallet connector API enabled status');
-          return connectorAPI;
-        }),
-        timeout({
-          first: 5_000,
-          with: () =>
-            throwError(() => {
-              this.logger.error('Wallet connector API has failed to respond');
-              return new Error('Midnight Lace wallet has failed to respond. Extension enabled?');
-            }),
-        }),
-        concatMap(async (connectorAPI) => ({ 
-          walletConnectorAPI: await connectorAPI.enable(), 
-          connectorAPI 
-        })),
-        concatMap(async ({ walletConnectorAPI, connectorAPI }) => {
-          const uris = await connectorAPI.getServiceUriConfig();
-          this.logger.info('Connected to wallet connector API and retrieved service configuration');
-          return { wallet: walletConnectorAPI, uris };
-        })
-      )
-    );
+  // Simplified for development - will implement real wallet connection later
+  private async connectToWallet(): Promise<any> {
+    this.logger.info('Mock wallet connection for development');
+    return {
+      wallet: {
+        state: async () => ({ coinPublicKey: 'mock-key', encryptionPublicKey: 'mock-key' }),
+        getBalanceInfo: async () => ({ amount: 1000n }),
+        submitTransaction: async () => 'mock-tx-id'
+      },
+      uris: {
+        indexer: 'mock-uri',
+        zkConfigProvider: 'mock-uri',
+        proverServer: 'mock-uri'
+      }
+    };
   }
 }
